@@ -50,6 +50,8 @@
 
 > 서비스의 전체 페이지 구조와 페이지 간 이동 흐름; 각 페이지의 주요 UI 구성, 입력 요소, 버튼, 사용자 행동 흐름 등을 간단한 와이어프레임 형태로 정리
 
+https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86%EC%9D%8C?node-id=0-1&t=WXCKo5dTreEh07bc-1
+
 <!-- Figma 링크 또는 이미지 첨부 -->
 
 ---
