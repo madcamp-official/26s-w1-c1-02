@@ -59,7 +59,7 @@ https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86
 ## DB 스키마
 
 > 필요한 테이블, 주요 필드, 데이터 타입, 테이블 간 관계를 정리
-
+브랜치 되나?
 <!-- ERD 이미지 또는 테이블 정의 -->
 
 ---
