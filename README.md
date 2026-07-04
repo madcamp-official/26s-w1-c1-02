@@ -50,6 +50,8 @@
 
 > 서비스의 전체 페이지 구조와 페이지 간 이동 흐름; 각 페이지의 주요 UI 구성, 입력 요소, 버튼, 사용자 행동 흐름 등을 간단한 와이어프레임 형태로 정리
 
+https://app.notion.com/p/IA-392959393fb7802a9657e835c4e47fc6?source=copy_link
+
 https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86%EC%9D%8C?node-id=0-1&t=WXCKo5dTreEh07bc-1
 
 <!-- Figma 링크 또는 이미지 첨부 -->
@@ -59,7 +61,7 @@ https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86
 ## DB 스키마
 
 > 필요한 테이블, 주요 필드, 데이터 타입, 테이블 간 관계를 정리
-브랜치 되나?
+
 <!-- ERD 이미지 또는 테이블 정의 -->
 
 ---
@@ -70,7 +72,12 @@ https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86
 
 | Method | Endpoint | 설명 | 요청 | 응답 |
 |---|---|---|---|---|
-|  |  |  |  |  |
+| POST | /api/signup | 회원가입 | `{ username, email, password, nickname }` | 201: `{ token, user: { id, username, email, nickname } }` <br> 400: 필드 누락 <br> 409: 아이디 중복 |
+| POST | /api/login | 로그인 | `{ username, password }` | 200: `{ token, user: { id, username, email, nickname } }` <br> 400: 필드 누락 <br> 401: 아이디/비밀번호 불일치 |
+
+- 인증 방식: JWT (`Authorization: Bearer <token>`, 만료 7일)
+- 비밀번호는 bcrypt로 해싱하여 저장
+- 소셜 로그인(카카오/구글 등)은 추후 추가 예정
 
 ---
 
