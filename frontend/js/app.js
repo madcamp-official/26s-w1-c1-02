@@ -13,7 +13,9 @@
 
   // ---- solo games catalog (다른 그림 찾기 is the featured playable mode) ----
   const SOLO_GAMES = [
-    { id: "spot", icon: "🔍", title: "다른 그림 찾기", badge: { c: "new", t: "NEW" },
+    { id: "vowel", icon: "🔡", title: "자음 모음 조합", badge: { c: "new", t: "NEW" },
+      desc: "흩어진 자음·모음을 모두 조합해 실제 단어를 만드세요.", lv: 1, done: 0, total: 20, playable: true },
+    { id: "spot", icon: "🔍", title: "다른 그림 찾기", badge: { c: "hot", t: "인기" },
       desc: "두 그림에서 서로 다른 부분을 제한 시간 안에 찾아보세요.", lv: 1, done: 0, total: 20, playable: true },
     { id: "word", icon: "🔤", title: "끝말잇기 연습", badge: { c: "rec", t: "초보자 추천" },
       desc: "AI와 함께 끝말잇기 연습. 난이도를 선택할 수 있어요.", lv: 7, done: 6, total: 15 },
@@ -202,7 +204,7 @@
   function h(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; }
 
   function navHTML() {
-    const tab = (id, label) => `<button class="nav-tab${state.view === id || (id === "solo" && state.view === "game:spot") ? " active" : ""}" data-nav="${id}">${label}</button>`;
+    const tab = (id, label) => `<button class="nav-tab${state.view === id || (id === "solo" && state.view.startsWith("game:")) ? " active" : ""}" data-nav="${id}">${label}</button>`;
     return `
       <div class="nav">
         <div class="nav-brand">
@@ -333,7 +335,7 @@
     content.querySelectorAll("[data-game]").forEach((el) => {
       el.addEventListener("click", () => {
         const g = SOLO_GAMES.find((x) => x.id === el.dataset.game);
-        if (g && g.playable) go("game:spot");
+        if (g && g.playable) go("game:" + g.id);
         else toast(`"${g.title}"는 준비 중이에요.`);
       });
     });
@@ -352,6 +354,21 @@
       </div>`);
     const mount = content.querySelector("#game-mount");
     state.gameCleanup = window.SpotDifference.mount(mount, { onExit: () => go("solo") });
+    return [content, null];
+  }
+
+  function vowelGameView() {
+    const content = h(`
+      <div class="content">
+        <div class="page-head">
+          <button class="page-back" data-nav="solo">←</button>
+          <div class="page-title">자음 모음 조합</div>
+          <div class="page-sub">자모를 모두 조합해 단어를 만드세요</div>
+        </div>
+        <div id="game-mount"></div>
+      </div>`);
+    const mount = content.querySelector("#game-mount");
+    state.gameCleanup = window.VowelGame.mount(mount, { onExit: () => go("solo") });
     return [content, null];
   }
 
@@ -457,6 +474,7 @@
     if (state.view === "lobby") [content, sidebar] = lobbyView();
     else if (state.view === "solo") [content, sidebar] = soloView();
     else if (state.view === "game:spot") [content, sidebar] = spotGameView();
+    else if (state.view === "game:vowel") [content, sidebar] = vowelGameView();
     else if (state.view === "multi") [content, sidebar] = multiView();
 
     mountedSidebar = sidebar;
@@ -503,7 +521,7 @@
 
   // ---------- boot ----------
   const initial = (location.hash || "").replace("#", "");
-  if (["login", "lobby", "solo", "multi", "game:spot"].includes(initial)) state.view = initial;
+  if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel"].includes(initial)) state.view = initial;
   render();
 
   // BGM이 켜진 상태로 저장돼 있으면, 브라우저 자동재생 정책상 첫 클릭에서 재생 시작
