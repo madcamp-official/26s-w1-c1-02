@@ -3,8 +3,8 @@
 (function () {
   const app = document.getElementById("app");
 
-  // ---- guest identity (no login yet) ----
-  const GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
+  // ---- guest identity (replaced with real nickname after login) ----
+  let GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
   const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
@@ -194,6 +194,53 @@
 
     // 로그아웃 (백엔드 세션 붙기 전까지는 로그인 화면으로 복귀)
     o.querySelector("#btn-logout")?.addEventListener("click", () => { close(); go("login"); });
+
+    document.body.appendChild(o);
+  }
+
+  function openSignup() {
+    if (document.getElementById("signup-overlay")) return;
+    const o = h(`
+      <div class="overlay" id="signup-overlay">
+        <div class="settings">
+          <div class="settings-head"><h2>회원가입</h2><button class="settings-close" title="닫기">✕</button></div>
+          <form class="login-card" id="signup-form">
+            <input class="login-input" id="su-username" placeholder="아이디" autocomplete="username" />
+            <input class="login-input" id="su-email" type="email" placeholder="이메일" autocomplete="email" />
+            <input class="login-input" id="su-nickname" placeholder="닉네임" />
+            <input class="login-input" id="su-password" type="password" placeholder="비밀번호" autocomplete="new-password" />
+            <button type="submit" class="login-btn primary">가입하기</button>
+          </form>
+        </div>
+      </div>`);
+
+    const close = () => o.remove();
+    o.addEventListener("click", (e) => { if (e.target === o) close(); });
+    o.querySelector(".settings-close").addEventListener("click", close);
+
+    o.querySelector("#signup-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = o.querySelector("#su-username").value.trim();
+      const email = o.querySelector("#su-email").value.trim();
+      const nickname = o.querySelector("#su-nickname").value.trim();
+      const password = o.querySelector("#su-password").value;
+      if (!username || !email || !nickname || !password) { toast("아이디, 이메일, 비밀번호, 닉네임을 모두 입력해주세요."); return; }
+      try {
+        const res = await fetch("/api/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, email, password, nickname }),
+        });
+        const data = await res.json();
+        if (!res.ok) { toast(data.message || "회원가입에 실패했습니다."); return; }
+        localStorage.setItem("mgh.token", data.token);
+        GUEST_ID = data.user.nickname || data.user.username;
+        close();
+        go("lobby");
+      } catch {
+        toast("서버에 연결할 수 없습니다.");
+      }
+    });
 
     document.body.appendChild(o);
   }
@@ -429,9 +476,27 @@
       </div>`);
 
     shell.querySelector("#login-gear").addEventListener("click", openSettings);
-    // 실제 인증은 백엔드 연동 후. 지금은 로그인 시 로비로 진입(임시).
-    shell.querySelector("#login-form").addEventListener("submit", (e) => { e.preventDefault(); go("lobby"); });
-    shell.querySelector("#btn-signup").addEventListener("click", () => toast("회원가입은 백엔드 연동 후 제공됩니다."));
+    shell.querySelector("#login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = shell.querySelector("#login-id").value.trim();
+      const password = shell.querySelector("#login-pw").value;
+      if (!username || !password) { toast("아이디와 비밀번호를 입력해주세요."); return; }
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) { toast(data.message || "로그인에 실패했습니다."); return; }
+        localStorage.setItem("mgh.token", data.token);
+        GUEST_ID = data.user.nickname || data.user.username;
+        go("lobby");
+      } catch {
+        toast("서버에 연결할 수 없습니다.");
+      }
+    });
+    shell.querySelector("#btn-signup").addEventListener("click", openSignup);
     shell.querySelectorAll(".social-btn").forEach((b) => b.addEventListener("click", () => {
       const prov = b.classList.contains("kakao") ? "카카오" : b.classList.contains("naver") ? "네이버" : "Google";
       toast(`${prov} 로그인은 백엔드 연동 후 제공됩니다.`);

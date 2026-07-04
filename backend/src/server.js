@@ -1,17 +1,24 @@
+require('dotenv').config();
 const http = require('http');
+const express = require('express');
 const { WebSocketServer } = require('ws');
+const connectDB = require('./db');
+const signupRouter = require('./routes/signup');
+const loginRouter = require('./routes/login');
 
 const PORT = process.env.PORT || 8080;
 
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('ok');
-    return;
-  }
-  res.writeHead(404);
-  res.end();
+connectDB().catch((err) => {
+  console.error('MongoDB 연결 실패:', err.message);
 });
+
+const app = express();
+app.use(express.json());
+app.use('/api', signupRouter);
+app.use('/api', loginRouter);
+app.get('/health', (req, res) => res.status(200).send('ok'));
+
+const server = http.createServer(app);
 
 const wss = new WebSocketServer({ server, path: '/ws' });
 

@@ -72,7 +72,12 @@ https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86
 
 | Method | Endpoint | 설명 | 요청 | 응답 |
 |---|---|---|---|---|
-|  |  |  |  |  |
+| POST | /api/signup | 회원가입 | `{ username, email, password, nickname }` | 201: `{ token, user: { id, username, email, nickname } }` <br> 400: 필드 누락 <br> 409: 아이디 중복 |
+| POST | /api/login | 로그인 | `{ username, password }` | 200: `{ token, user: { id, username, email, nickname } }` <br> 400: 필드 누락 <br> 401: 아이디/비밀번호 불일치 |
+
+- 인증 방식: JWT (`Authorization: Bearer <token>`, 만료 7일)
+- 비밀번호는 bcrypt로 해싱하여 저장
+- 소셜 로그인(카카오/구글 등)은 추후 추가 예정
 
 ---
 
