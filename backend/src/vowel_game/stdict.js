@@ -21,9 +21,10 @@ async function lookupAndCache(word) {
     if (!r.ok) return false;
     const data = await r.json();
     const total = data?.channel?.total ?? 0;
-    // 정확히 그 표제어가 있는지 확인
-    const items = data?.channel?.item || [];
-    found = total > 0 && items.some((it) => (it.word || "").replace(/-/g, "") === word);
+    // 정확히 그 표제어가 있는지 확인 (item 은 단일 결과 시 객체일 수 있어 배열 정규화)
+    const raw = data?.channel?.item;
+    const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    found = total > 0 && items.some((it) => (it.word || "").replace(/[-^]/g, "") === word);
   } catch (e) {
     return false; // 네트워크/rate-limit 실패 시 조용히 폴백 안함
   }
