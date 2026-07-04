@@ -9,7 +9,7 @@
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
   // ---- app state ----
-  const state = { view: "lobby", online: 1, gameCleanup: null };
+  const state = { view: "login", online: 1, gameCleanup: null };
 
   // ---- solo games catalog (다른 그림 찾기 is the featured playable mode) ----
   const SOLO_GAMES = [
@@ -65,6 +65,139 @@
   };
   chat.connect();
 
+  // ---------- audio (WebAudio, asset-free) ----------
+  const audio = {
+    ctx: null, bgmGain: null, sfxGain: null, bgmNodes: null, _bgm: 0.5, _sfx: 0.7,
+    ensure() {
+      if (this.ctx) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      this.ctx = new Ctx();
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.value = this._bgm * 0.12;
+      this.bgmGain.connect(this.ctx.destination);
+      this.sfxGain = this.ctx.createGain();
+      this.sfxGain.gain.value = this._sfx;
+      this.sfxGain.connect(this.ctx.destination);
+    },
+    resume() { this.ensure(); if (this.ctx && this.ctx.state === "suspended") this.ctx.resume(); },
+    setBgm(v) { this._bgm = v; if (this.bgmGain) this.bgmGain.gain.value = v * 0.12; },
+    setSfx(v) { this._sfx = v; if (this.sfxGain) this.sfxGain.gain.value = v; },
+    blip() {
+      this.resume(); if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = "triangle"; o.frequency.value = 660;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.9, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.17);
+    },
+    startBgm() {
+      this.resume(); if (!this.ctx || this.bgmNodes) return;
+      const freqs = [220, 277.18, 329.63]; // A minor-ish soft pad (A3 / C#4 / E4)
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = "lowpass"; filter.frequency.value = 700; filter.Q.value = 0.6;
+      filter.connect(this.bgmGain);
+      const lfo = this.ctx.createOscillator(), lfoGain = this.ctx.createGain();
+      lfo.frequency.value = 0.06; lfoGain.gain.value = 240;
+      lfo.connect(lfoGain); lfoGain.connect(filter.frequency); lfo.start();
+      const oscs = freqs.map((f, i) => {
+        const o = this.ctx.createOscillator();
+        o.type = "sine"; o.frequency.value = f; o.detune.value = (i - 1) * 4;
+        o.connect(filter); o.start();
+        return o;
+      });
+      this.bgmNodes = { oscs, lfo };
+    },
+    stopBgm() {
+      if (!this.bgmNodes) return;
+      this.bgmNodes.oscs.forEach((o) => { try { o.stop(); } catch (e) {} });
+      try { this.bgmNodes.lfo.stop(); } catch (e) {}
+      this.bgmNodes = null;
+    },
+  };
+
+  // ---------- settings (persisted in localStorage) ----------
+  const LS = { theme: "mgh.theme", bgm: "mgh.bgm", sfx: "mgh.sfx", bgmOn: "mgh.bgmOn" };
+  function lsNum(k, d) { const v = parseInt(localStorage.getItem(k), 10); return isNaN(v) ? d : v; }
+  const settings = {
+    theme: localStorage.getItem(LS.theme) || "light",
+    bgm: lsNum(LS.bgm, 50),
+    sfx: lsNum(LS.sfx, 70),
+    bgmOn: localStorage.getItem(LS.bgmOn) === "1",
+  };
+  function applyTheme(t) {
+    settings.theme = t; localStorage.setItem(LS.theme, t);
+    document.documentElement.setAttribute("data-theme", t);
+  }
+  applyTheme(settings.theme);
+  audio._bgm = settings.bgm / 100; audio._sfx = settings.sfx / 100;
+
+  function openSettings() {
+    if (document.getElementById("settings-overlay")) return;
+    const o = h(`
+      <div class="overlay" id="settings-overlay">
+        <div class="settings">
+          <div class="settings-head"><h2>⚙️ 설정</h2><button class="settings-close" title="닫기">✕</button></div>
+          <div class="set-row">
+            <div class="set-label"><span>🎵 배경음악 (BGM)</span><span class="set-val" id="v-bgm">${settings.bgm}%</span></div>
+            <div class="set-ctl">
+              <button class="set-toggle${settings.bgmOn ? " on" : ""}" id="bgm-toggle">${settings.bgmOn ? "⏸" : "▶"}</button>
+              <input type="range" min="0" max="100" value="${settings.bgm}" id="s-bgm" />
+            </div>
+          </div>
+          <div class="set-row">
+            <div class="set-label"><span>🔊 게임 소리</span><span class="set-val" id="v-sfx">${settings.sfx}%</span></div>
+            <div class="set-ctl"><input type="range" min="0" max="100" value="${settings.sfx}" id="s-sfx" /></div>
+          </div>
+          <div class="set-row">
+            <div class="set-label"><span>🎨 테마</span></div>
+            <div class="theme-seg">
+              <button data-theme-opt="light" class="${settings.theme === "light" ? "active" : ""}">☀️ 라이트</button>
+              <button data-theme-opt="dark" class="${settings.theme === "dark" ? "active" : ""}">🌙 다크</button>
+            </div>
+          </div>
+          ${state.view !== "login" ? `
+          <div class="set-row">
+            <button class="logout-btn" id="btn-logout">🚪 로그아웃</button>
+          </div>` : ""}
+        </div>
+      </div>`);
+
+    const close = () => o.remove();
+    o.addEventListener("click", (e) => { if (e.target === o) close(); });
+    o.querySelector(".settings-close").addEventListener("click", close);
+
+    const sBgm = o.querySelector("#s-bgm"), vBgm = o.querySelector("#v-bgm"), tBgm = o.querySelector("#bgm-toggle");
+    sBgm.addEventListener("input", () => {
+      settings.bgm = +sBgm.value; localStorage.setItem(LS.bgm, settings.bgm);
+      vBgm.textContent = settings.bgm + "%"; audio.setBgm(settings.bgm / 100);
+    });
+    tBgm.addEventListener("click", () => {
+      settings.bgmOn = !settings.bgmOn; localStorage.setItem(LS.bgmOn, settings.bgmOn ? "1" : "0");
+      if (settings.bgmOn) { audio.setBgm(settings.bgm / 100); audio.startBgm(); tBgm.classList.add("on"); tBgm.textContent = "⏸"; }
+      else { audio.stopBgm(); tBgm.classList.remove("on"); tBgm.textContent = "▶"; }
+    });
+
+    const sSfx = o.querySelector("#s-sfx"), vSfx = o.querySelector("#v-sfx");
+    sSfx.addEventListener("input", () => {
+      settings.sfx = +sSfx.value; localStorage.setItem(LS.sfx, settings.sfx);
+      vSfx.textContent = settings.sfx + "%"; audio.setSfx(settings.sfx / 100);
+    });
+    sSfx.addEventListener("change", () => audio.blip()); // 슬라이더 놓으면 미리듣기
+
+    o.querySelectorAll("[data-theme-opt]").forEach((b) => b.addEventListener("click", () => {
+      applyTheme(b.dataset.themeOpt);
+      o.querySelectorAll("[data-theme-opt]").forEach((x) => x.classList.toggle("active", x === b));
+    }));
+
+    // 로그아웃 (백엔드 세션 붙기 전까지는 로그인 화면으로 복귀)
+    o.querySelector("#btn-logout")?.addEventListener("click", () => { close(); go("login"); });
+
+    document.body.appendChild(o);
+  }
+
   // ---------- rendering ----------
   function h(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; }
 
@@ -84,8 +217,8 @@
         <div class="nav-spacer"></div>
         <div class="nav-right">
           <div class="nav-online"><span class="dot-live"></span>${chat.connected ? "실시간 연결됨" : "오프라인 모드"}</div>
-          <div class="nav-icon">🔔</div>
-          <div class="nav-icon">⚙️</div>
+          <button class="nav-icon">🔔</button>
+          <button class="nav-icon" id="nav-gear" title="설정">⚙️</button>
           <div class="nav-guest"><div class="av">🙂</div><div class="who">${GUEST_ID}</div></div>
         </div>
       </div>`;
@@ -259,11 +392,66 @@
     return [content, sidebarUsers()];
   }
 
+  // ---- social brand icons (inline SVG, no external assets) ----
+  const ICON = {
+    kakao: '<svg viewBox="0 0 24 24" fill="#191600"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.5-.8 2.9-.1.5.2.5.4.4.2-.1 2.7-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>',
+    naver: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M16.3 12.6 7.4 0H0v24h7.7V11.4L16.6 24H24V0h-7.7z"/></svg>',
+    google: '<svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.9 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.5 3-2.2 5.5-4.7 7.2l7.3 5.7c4.3-3.9 6.8-9.7 6.8-16.4z"/><path fill="#FBBC05" d="M10.5 28.4c-.5-1.5-.8-3.1-.8-4.9s.3-3.4.8-4.9l-7.9-6.1C1 15.6 0 19.6 0 24s1 8.4 2.6 11.5l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.3-5.7c-2 1.4-4.7 2.3-8.2 2.3-6.3 0-11.7-3.7-13.5-9.4l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>',
+  };
+
+  function loginView() {
+    const shell = h(`
+      <div class="app-shell login-shell">
+        <header class="login-top">
+          <div class="nav-brand">
+            <div class="nav-logo">미</div>
+            <div class="nav-title">미니게임천국</div>
+          </div>
+          <button class="nav-icon" id="login-gear" title="설정">⚙️</button>
+        </header>
+        <main class="login-main">
+          <form class="login-card" id="login-form">
+            <input class="login-input" id="login-id" placeholder="아이디" autocomplete="username" />
+            <input class="login-input" id="login-pw" type="password" placeholder="비밀번호" autocomplete="current-password" />
+            <div class="login-div"></div>
+            <div class="login-actions">
+              <button type="submit" class="login-btn primary">로그인</button>
+              <button type="button" class="login-btn primary" id="btn-signup">회원가입</button>
+            </div>
+            <div class="login-or"><span>소셜 계정으로 시작</span></div>
+            <div class="social">
+              <button type="button" class="social-btn kakao">${ICON.kakao}<span>카카오로 시작하기</span></button>
+              <button type="button" class="social-btn naver">${ICON.naver}<span>네이버로 시작하기</span></button>
+              <button type="button" class="social-btn google">${ICON.google}<span>Google로 시작하기</span></button>
+            </div>
+          </form>
+        </main>
+      </div>`);
+
+    shell.querySelector("#login-gear").addEventListener("click", openSettings);
+    // 실제 인증은 백엔드 연동 후. 지금은 로그인 시 로비로 진입(임시).
+    shell.querySelector("#login-form").addEventListener("submit", (e) => { e.preventDefault(); go("lobby"); });
+    shell.querySelector("#btn-signup").addEventListener("click", () => toast("회원가입은 백엔드 연동 후 제공됩니다."));
+    shell.querySelectorAll(".social-btn").forEach((b) => b.addEventListener("click", () => {
+      const prov = b.classList.contains("kakao") ? "카카오" : b.classList.contains("naver") ? "네이버" : "Google";
+      toast(`${prov} 로그인은 백엔드 연동 후 제공됩니다.`);
+    }));
+    return shell;
+  }
+
   // ---------- router ----------
   let mountedSidebar = null;
   function render() {
     if (state.gameCleanup) { state.gameCleanup(); state.gameCleanup = null; }
     if (mountedSidebar && mountedSidebar._cleanup) mountedSidebar._cleanup();
+    mountedSidebar = null;
+
+    // 로그인 화면은 독립 레이아웃 (표준 네비/사이드바 없음)
+    if (state.view === "login") {
+      app.innerHTML = "";
+      app.appendChild(loginView());
+      return;
+    }
 
     let content, sidebar;
     if (state.view === "lobby") [content, sidebar] = lobbyView();
@@ -286,6 +474,7 @@
     shell.querySelectorAll("[data-nav]").forEach((el) =>
       el.addEventListener("click", () => go(el.dataset.nav))
     );
+    shell.querySelector("#nav-gear")?.addEventListener("click", openSettings);
   }
 
   function go(view) { state.view = view; location.hash = view; render(); }
@@ -314,6 +503,12 @@
 
   // ---------- boot ----------
   const initial = (location.hash || "").replace("#", "");
-  if (["lobby", "solo", "multi", "game:spot"].includes(initial)) state.view = initial;
+  if (["login", "lobby", "solo", "multi", "game:spot"].includes(initial)) state.view = initial;
   render();
+
+  // BGM이 켜진 상태로 저장돼 있으면, 브라우저 자동재생 정책상 첫 클릭에서 재생 시작
+  if (settings.bgmOn) {
+    const kick = () => { audio.setBgm(settings.bgm / 100); audio.startBgm(); document.removeEventListener("click", kick); };
+    document.addEventListener("click", kick);
+  }
 })();
