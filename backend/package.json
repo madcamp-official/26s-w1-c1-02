@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "seed": "node src/vowel_game/seed.js"
+    "seed": "node src/vowel_game/seed.js",
+    "seed:nouns": "node src/vowel_game/seed-nouns.js"
   },
   "dependencies": {
     "express": "^4.21.2",
