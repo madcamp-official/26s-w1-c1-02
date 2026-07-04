@@ -1,0 +1,15 @@
+# secrets — never commit
+.cloudflare.env
+.env
+*.env
+!.env.example
+
+# node
+node_modules/
+npm-debug.log*
+
+# os / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
