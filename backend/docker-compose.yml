@@ -1,16 +1,54 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: minigameheaven-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=minigameheaven
+      - POSTGRES_USER=mgh
+      - POSTGRES_PASSWORD=mgh_dev_pw
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mgh -d minigameheaven"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   ws-server:
     build: .
     container_name: minigameheaven
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8080:8080"
     environment:
       - PORT=8080
+      # 게임(자음 모음 조합) — 로컬 Postgres
+      - DATABASE_URL=postgres://mgh:mgh_dev_pw@db:5432/minigameheaven
+      # 로그인/회원가입 — MongoDB Atlas + JWT
       - MONGO_URI=${MONGO_URI}
       - JWT_SECRET=${JWT_SECRET}
+      # 국립국어원 표준국어대사전 API 키 (선택) — 로컬 DB에 없는 단어 폴백 검증용
+      - STDICT_API_KEY=${STDICT_API_KEY:-}
+    mem_limit: 384m
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  db-data:
+
+# OpenStack(VXLAN) 호스트 MTU 1450 에 맞춤 — 기본 1500 이면 외부 HTTPS(예: 국립국어원 API) 핸드셰이크가 멈춤
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"
