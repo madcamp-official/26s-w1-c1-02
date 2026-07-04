@@ -1,9 +1,9 @@
 // 시작용 단어 목록을 words 테이블에 적재.
-// 사용: node scripts/seed-words.js [파일경로]  (기본: data/words-starter.txt)
+// 사용: node src/vowel_game/seed.js [파일경로]  (기본: 같은 폴더의 words.txt)
 const fs = require("fs");
 const path = require("path");
-const { pool, migrate } = require("../src/db");
-const { decompose, jamoKey } = require("../src/jamo");
+const { pool, migrate } = require("../db");
+const { decompose, jamoKey } = require("./jamo");
 
 function syllableCount(word) {
   let n = 0;
@@ -12,7 +12,7 @@ function syllableCount(word) {
 }
 
 async function main() {
-  const file = process.argv[2] || path.join(__dirname, "..", "data", "words-starter.txt");
+  const file = process.argv[2] || path.join(__dirname, "words.txt");
   const words = fs.readFileSync(file, "utf8").split(/\r?\n/).map((w) => w.trim()).filter(Boolean);
 
   await migrate();

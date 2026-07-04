@@ -2,7 +2,7 @@ const http = require("http");
 const express = require("express");
 const { WebSocketServer } = require("ws");
 const { migrate } = require("./db");
-const jamoApi = require("./api-jamo");
+const jamoApi = require("./vowel_game/api");
 
 const PORT = process.env.PORT || 8080;
 

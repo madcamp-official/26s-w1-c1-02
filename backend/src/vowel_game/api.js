@@ -1,6 +1,6 @@
 // 자음 모음 조합 게임 REST API
 const express = require("express");
-const { pool } = require("./db");
+const { pool } = require("../db");
 const { decompose, jamoKey } = require("./jamo");
 const stdict = require("./stdict");
 

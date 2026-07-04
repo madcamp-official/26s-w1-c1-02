@@ -1,7 +1,7 @@
 // 국립국어원 표준국어대사전 Open API 폴백 검증.
 // 로컬 DB에 없는 단어만 조회 → 결과를 words 에 캐시(source='stdict').
 // STDICT_API_KEY 가 없으면 비활성(항상 false 반환) → 로컬 DB만으로 동작.
-const { pool } = require("./db");
+const { pool } = require("../db");
 const { decompose, jamoKey } = require("./jamo");
 
 const KEY = process.env.STDICT_API_KEY || "";
