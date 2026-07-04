@@ -41,3 +41,10 @@ services:
 
 volumes:
   db-data:
+
+# OpenStack(VXLAN) 호스트 MTU 1450 에 맞춤 — 기본 1500 이면 외부 HTTPS(예: 국립국어원 API) 핸드셰이크가 멈춤
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "1450"
