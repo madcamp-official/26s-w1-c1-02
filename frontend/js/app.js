@@ -9,7 +9,7 @@
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
   // ---- app state ----
-  const state = { view: "lobby", online: 1, gameCleanup: null };
+  const state = { view: "login", online: 1, gameCleanup: null };
 
   // ---- solo games catalog (다른 그림 찾기 is the featured playable mode) ----
   const SOLO_GAMES = [
@@ -259,11 +259,66 @@
     return [content, sidebarUsers()];
   }
 
+  // ---- social brand icons (inline SVG, no external assets) ----
+  const ICON = {
+    kakao: '<svg viewBox="0 0 24 24" fill="#191600"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.8 1.9 5.3 4.7 6.7-.2.7-.7 2.5-.8 2.9-.1.5.2.5.4.4.2-.1 2.7-1.8 3.7-2.5.6.1 1.3.1 2 .1 5.5 0 10-3.6 10-8S17.5 3 12 3z"/></svg>',
+    naver: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M16.3 12.6 7.4 0H0v24h7.7V11.4L16.6 24H24V0h-7.7z"/></svg>',
+    google: '<svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.9 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.5 3-2.2 5.5-4.7 7.2l7.3 5.7c4.3-3.9 6.8-9.7 6.8-16.4z"/><path fill="#FBBC05" d="M10.5 28.4c-.5-1.5-.8-3.1-.8-4.9s.3-3.4.8-4.9l-7.9-6.1C1 15.6 0 19.6 0 24s1 8.4 2.6 11.5l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.3-5.7c-2 1.4-4.7 2.3-8.2 2.3-6.3 0-11.7-3.7-13.5-9.4l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>',
+  };
+
+  function loginView() {
+    const shell = h(`
+      <div class="app-shell login-shell">
+        <header class="login-top">
+          <div class="nav-brand">
+            <div class="nav-logo">미</div>
+            <div class="nav-title">미니게임천국</div>
+          </div>
+          <button class="nav-icon" id="login-gear" title="설정">⚙️</button>
+        </header>
+        <main class="login-main">
+          <form class="login-card" id="login-form">
+            <input class="login-input" id="login-id" placeholder="아이디" autocomplete="username" />
+            <input class="login-input" id="login-pw" type="password" placeholder="비밀번호" autocomplete="current-password" />
+            <div class="login-div"></div>
+            <div class="login-actions">
+              <button type="submit" class="login-btn primary">로그인</button>
+              <button type="button" class="login-btn primary" id="btn-signup">회원가입</button>
+            </div>
+            <div class="login-or"><span>소셜 계정으로 시작</span></div>
+            <div class="social">
+              <button type="button" class="social-btn kakao">${ICON.kakao}<span>카카오로 시작하기</span></button>
+              <button type="button" class="social-btn naver">${ICON.naver}<span>네이버로 시작하기</span></button>
+              <button type="button" class="social-btn google">${ICON.google}<span>Google로 시작하기</span></button>
+            </div>
+          </form>
+        </main>
+      </div>`);
+
+    shell.querySelector("#login-gear").addEventListener("click", () => toast("설정은 준비 중입니다."));
+    // 실제 인증은 백엔드 연동 후. 지금은 로그인 시 로비로 진입(임시).
+    shell.querySelector("#login-form").addEventListener("submit", (e) => { e.preventDefault(); go("lobby"); });
+    shell.querySelector("#btn-signup").addEventListener("click", () => toast("회원가입은 백엔드 연동 후 제공됩니다."));
+    shell.querySelectorAll(".social-btn").forEach((b) => b.addEventListener("click", () => {
+      const prov = b.classList.contains("kakao") ? "카카오" : b.classList.contains("naver") ? "네이버" : "Google";
+      toast(`${prov} 로그인은 백엔드 연동 후 제공됩니다.`);
+    }));
+    return shell;
+  }
+
   // ---------- router ----------
   let mountedSidebar = null;
   function render() {
     if (state.gameCleanup) { state.gameCleanup(); state.gameCleanup = null; }
     if (mountedSidebar && mountedSidebar._cleanup) mountedSidebar._cleanup();
+    mountedSidebar = null;
+
+    // 로그인 화면은 독립 레이아웃 (표준 네비/사이드바 없음)
+    if (state.view === "login") {
+      app.innerHTML = "";
+      app.appendChild(loginView());
+      return;
+    }
 
     let content, sidebar;
     if (state.view === "lobby") [content, sidebar] = lobbyView();
@@ -314,6 +369,6 @@
 
   // ---------- boot ----------
   const initial = (location.hash || "").replace("#", "");
-  if (["lobby", "solo", "multi", "game:spot"].includes(initial)) state.view = initial;
+  if (["login", "lobby", "solo", "multi", "game:spot"].includes(initial)) state.view = initial;
   render();
 })();

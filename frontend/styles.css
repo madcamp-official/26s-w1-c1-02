@@ -220,6 +220,41 @@ button { font-family: inherit; cursor: pointer; }
 .modal p { color: var(--ink-soft); margin: 0 0 20px; }
 .modal .row { display: flex; gap: 10px; justify-content: center; }
 
+/* ---------- Login screen ---------- */
+.login-shell {
+  min-height: 100dvh; display: flex; flex-direction: column;
+  background: linear-gradient(135deg, #f6ecdb 0%, #fdf7e6 55%, #fbf2dd 100%);
+}
+.login-top { height: var(--nav-h); display: flex; align-items: center; justify-content: space-between; padding: 0 22px; }
+.login-top .nav-icon { border: 0; cursor: pointer; }
+.login-top .nav-icon:hover { background: var(--accent-soft); }
+.login-main { flex: 1; display: grid; place-items: center; padding: 24px; }
+.login-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px; }
+.login-input {
+  width: 100%; padding: 17px 18px; border-radius: 14px; border: 1px solid var(--border);
+  background: #eaddc7; color: var(--ink); font-size: 16px; font-weight: 700; text-align: center;
+}
+.login-input::placeholder { color: #b3a184; font-weight: 700; }
+.login-input:focus { outline: none; border-color: var(--accent); background: #efe6d4; }
+.login-div { height: 1px; background: #cbb89a; margin: 6px 2px 2px; }
+.login-actions { display: flex; gap: 14px; }
+.login-btn { flex: 1; padding: 15px 0; border-radius: 14px; border: 0; font-size: 16px; font-weight: 800; cursor: pointer; }
+.login-btn.primary { background: #a68763; color: #fff; }
+.login-btn.primary:hover { background: #9a7a56; }
+.login-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; margin: 10px 0 2px; }
+.login-or::before, .login-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.social { display: flex; flex-direction: column; gap: 10px; }
+.social-btn {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 14px 16px; border-radius: 12px; border: 0;
+  font-size: 15px; font-weight: 700; cursor: pointer; transition: filter .12s;
+}
+.social-btn svg { position: absolute; left: 16px; width: 18px; height: 18px; }
+.social-btn.kakao { background: #FEE500; color: #191600; }
+.social-btn.naver { background: #03C75A; color: #fff; }
+.social-btn.google { background: #fff; color: #3c4043; border: 1px solid #dadce0; }
+.social-btn:hover { filter: brightness(0.97); }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   .sidebar { display: none; }
