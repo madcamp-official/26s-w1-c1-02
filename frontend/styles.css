@@ -334,3 +334,8 @@ input[type="range"]::-moz-range-thumb {
   color: var(--ink-soft); font-size: 14px; font-weight: 700; cursor: pointer;
 }
 .theme-seg button.active { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); }
+.logout-btn {
+  width: 100%; padding: 13px 0; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--card); color: var(--danger); font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.logout-btn:hover { background: var(--danger); color: #fff; border-color: transparent; }

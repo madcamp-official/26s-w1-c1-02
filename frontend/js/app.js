@@ -158,6 +158,10 @@
               <button data-theme-opt="dark" class="${settings.theme === "dark" ? "active" : ""}">🌙 다크</button>
             </div>
           </div>
+          ${state.view !== "login" ? `
+          <div class="set-row">
+            <button class="logout-btn" id="btn-logout">🚪 로그아웃</button>
+          </div>` : ""}
         </div>
       </div>`);
 
@@ -187,6 +191,9 @@
       applyTheme(b.dataset.themeOpt);
       o.querySelectorAll("[data-theme-opt]").forEach((x) => x.classList.toggle("active", x === b));
     }));
+
+    // 로그아웃 (백엔드 세션 붙기 전까지는 로그인 화면으로 복귀)
+    o.querySelector("#btn-logout")?.addEventListener("click", () => { close(); go("login"); });
 
     document.body.appendChild(o);
   }
