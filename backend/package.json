@@ -4,9 +4,12 @@
   "private": true,
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed": "node scripts/seed-words.js"
   },
   "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
     "ws": "^8.18.0"
   }
 }
