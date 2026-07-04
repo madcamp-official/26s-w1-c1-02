@@ -69,7 +69,7 @@ button { font-family: inherit; cursor: pointer; }
 .nav-right { display: flex; align-items: center; gap: 14px; color: var(--ink-soft); }
 .nav-online { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(122,154,95,.18); }
-.nav-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f3ece1; font-size: 15px; }
+.nav-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f3ece1; font-size: 15px; border: 0; cursor: pointer; color: inherit; }
 .nav-guest {
   display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px;
   border-radius: 999px; background: #f3ece1;
@@ -266,3 +266,71 @@ button { font-family: inherit; cursor: pointer; }
   .nav { padding: 0 12px; }
   .main { padding: 12px; }
 }
+
+/* ---------- Dark theme ---------- */
+:root[data-theme="dark"] {
+  --bg: #1d1915;
+  --surface: #29231d;
+  --card: #322a22;
+  --card-strong: #3b3128;
+  --border: #3d342a;
+  --ink: #f1e7d8;
+  --ink-soft: #cbbca8;
+  --muted: #9c8b76;
+  --accent: #d3a869;
+  --accent-soft: #4a3d2b;
+  --gold: #d6ad6a;
+  --track: #40372c;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+}
+/* dark overrides for hardcoded light surfaces */
+:root[data-theme="dark"] .login-shell { background: linear-gradient(135deg, #241e18 0%, #2b241d 55%, #201b15 100%); }
+:root[data-theme="dark"] .login-input { background: #322a22; }
+:root[data-theme="dark"] .login-input::placeholder { color: #8a7a64; }
+:root[data-theme="dark"] .login-input:focus { background: #3a3128; }
+:root[data-theme="dark"] .login-div { background: #4a3f31; }
+:root[data-theme="dark"] .banner { background: linear-gradient(135deg, #342a20, #2c241c); }
+:root[data-theme="dark"] .nav-tab:hover,
+:root[data-theme="dark"] .nav-icon,
+:root[data-theme="dark"] .nav-guest,
+:root[data-theme="dark"] .page-back { background-color: #363029; }
+:root[data-theme="dark"] .rooms tbody tr:hover { background: #2f2820; }
+:root[data-theme="dark"] .sd-cell.found { background: #2e3a26; }
+:root[data-theme="dark"] .social-btn.google { background: #f5f2ec; }
+
+/* ---------- Range sliders ---------- */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+  border-radius: 999px; background: var(--track); outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer;
+  border: 2px solid var(--surface);
+}
+
+/* ---------- Settings panel ---------- */
+.settings {
+  background: var(--surface); border-radius: 18px; padding: 22px 24px 26px; width: 340px; max-width: calc(100vw - 32px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); border: 1px solid var(--border);
+}
+.settings-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.settings-head h2 { margin: 0; font-size: 18px; }
+.settings-close { border: 0; background: transparent; font-size: 18px; color: var(--muted); cursor: pointer; width: 32px; height: 32px; border-radius: 9px; }
+.settings-close:hover { background: var(--card); color: var(--ink); }
+.set-row { padding: 14px 0; border-top: 1px solid var(--border); }
+.set-row:first-of-type { border-top: 0; }
+.set-label { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.set-val { color: var(--accent); font-weight: 800; font-variant-numeric: tabular-nums; }
+.set-ctl { display: flex; align-items: center; gap: 12px; }
+.set-toggle { flex: none; width: 38px; height: 34px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--ink); font-size: 13px; cursor: pointer; }
+.set-toggle.on { background: var(--accent); color: #fff; border-color: transparent; }
+.theme-seg { display: flex; gap: 8px; }
+.theme-seg button {
+  flex: 1; padding: 11px 0; border-radius: 11px; border: 1px solid var(--border); background: var(--card);
+  color: var(--ink-soft); font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.theme-seg button.active { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); }
