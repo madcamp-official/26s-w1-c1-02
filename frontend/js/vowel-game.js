@@ -6,17 +6,27 @@
   const JUNG = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ","ㅠ","ㅡ","ㅢ","ㅣ"];
   const JONG = ["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
 
-  // 단어/자모 → 자모 조각 배열 (서버 jamo.js 와 동일 규칙)
+  // 합성 자모 → 기본 자모 (서버 jamo.js 의 SPLIT 과 동일해야 함)
+  const SPLIT = {
+    "ㄲ":["ㄱ","ㄱ"],"ㄸ":["ㄷ","ㄷ"],"ㅃ":["ㅂ","ㅂ"],"ㅆ":["ㅅ","ㅅ"],"ㅉ":["ㅈ","ㅈ"],
+    "ㄳ":["ㄱ","ㅅ"],"ㄵ":["ㄴ","ㅈ"],"ㄶ":["ㄴ","ㅎ"],"ㄺ":["ㄹ","ㄱ"],"ㄻ":["ㄹ","ㅁ"],
+    "ㄼ":["ㄹ","ㅂ"],"ㄽ":["ㄹ","ㅅ"],"ㄾ":["ㄹ","ㅌ"],"ㄿ":["ㄹ","ㅍ"],"ㅀ":["ㄹ","ㅎ"],"ㅄ":["ㅂ","ㅅ"],
+    "ㅘ":["ㅗ","ㅏ"],"ㅙ":["ㅗ","ㅐ"],"ㅚ":["ㅗ","ㅣ"],"ㅝ":["ㅜ","ㅓ"],"ㅞ":["ㅜ","ㅔ"],"ㅟ":["ㅜ","ㅣ"],"ㅢ":["ㅡ","ㅣ"],
+  };
+  const pushJamo = (out, ch) => { if (SPLIT[ch]) out.push(...SPLIT[ch]); else out.push(ch); };
+
+  // 단어/자모 → 기본 자모 조각 배열 (서버 jamo.js 와 동일 규칙)
   function decompose(word) {
     const out = [];
     for (const ch of word) {
       const c = ch.codePointAt(0);
       if (c >= 0xac00 && c <= 0xd7a3) {
         const s = c - 0xac00;
-        out.push(CHO[Math.floor(s / 588)], JUNG[Math.floor((s % 588) / 28)]);
-        const jong = s % 28; if (jong > 0) out.push(JONG[jong]);
+        pushJamo(out, CHO[Math.floor(s / 588)]);
+        pushJamo(out, JUNG[Math.floor((s % 588) / 28)]);
+        const jong = s % 28; if (jong > 0) pushJamo(out, JONG[jong]);
       } else if (/[ㄱ-ㅎㅏ-ㅣ]/.test(ch)) {
-        out.push(ch);
+        pushJamo(out, ch);
       }
     }
     return out;
