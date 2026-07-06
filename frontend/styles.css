@@ -179,25 +179,25 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- 방 생성/참가 모달 ---------- */
 .room-modal {
-  background: var(--surface); border-radius: 18px; padding: 22px 24px 24px;
-  width: 380px; max-width: calc(100vw - 32px); border: 1px solid var(--border);
-  box-shadow: 0 20px 60px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 18px;
+  background: #f1e7d5; border-radius: 20px; padding: 26px 28px 28px;
+  width: 400px; max-width: calc(100vw - 32px); border: 1px solid #e6dac4;
+  box-shadow: 0 24px 64px rgba(61,46,32,.32); display: flex; flex-direction: column; gap: 20px;
 }
 .room-modal-head { display: flex; align-items: center; justify-content: space-between; }
-.room-modal-head h2 { margin: 0; font-size: 18px; }
-.rm-field { display: flex; flex-direction: column; gap: 8px; }
+.room-modal-head h2 { margin: 0; font-size: 19px; }
+.rm-field { display: flex; flex-direction: column; gap: 9px; }
 .rm-field > label { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
 .rm-input {
-  width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--border);
-  background: var(--card); color: var(--ink); font-size: 15px; font-weight: 600;
+  width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid #e7dcc7;
+  background: #fdf9ee; color: var(--ink); font-size: 15px; font-weight: 600;
 }
 .rm-input::placeholder { color: var(--muted); font-weight: 500; }
-.rm-input:focus { outline: none; border-color: var(--accent); }
+.rm-input:focus { outline: none; border-color: var(--accent); background: #fffdf6; }
 select.rm-input { appearance: none; cursor: pointer; }
 .rm-slider-label { font-size: 14px; font-weight: 800; color: var(--ink); }
 .rm-slider-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .rm-toggle-row { display: flex; align-items: center; justify-content: space-between; }
-.rm-toggle-row > span { font-size: 14px; font-weight: 700; }
+.rm-toggle-row > span { font-size: 15px; font-weight: 700; }
 .rm-switch {
   position: relative; width: 46px; height: 26px; border-radius: 999px; border: 0;
   background: var(--track); cursor: pointer; transition: background .15s; flex: none;
@@ -208,12 +208,19 @@ select.rm-input { appearance: none; cursor: pointer; }
 }
 .rm-switch.on { background: var(--accent); }
 .rm-switch.on::after { transform: translateX(20px); }
-.rm-actions { display: flex; gap: 12px; margin-top: 2px; }
-.rm-btn { flex: 1; padding: 14px 0; border-radius: 12px; border: 0; font-size: 15px; font-weight: 800; cursor: pointer; }
-.rm-btn.ghost { background: var(--card); color: var(--ink-soft); border: 1px solid var(--border); }
-.rm-btn.ghost:hover { background: var(--card-strong); }
-.rm-btn.primary { background: var(--ink); color: var(--surface); }
-.rm-btn.primary:hover { filter: brightness(1.15); }
+.rm-actions { display: flex; gap: 12px; margin-top: 4px; }
+.rm-btn { flex: 1; padding: 15px 0; border-radius: 12px; border: 0; font-size: 15px; font-weight: 800; cursor: pointer; }
+.rm-btn.ghost { background: #fdf9ee; color: var(--ink-soft); border: 1px solid #e7dcc7; }
+.rm-btn.ghost:hover { background: #fffdf6; }
+.rm-btn.primary { background: var(--ink); color: #fff; }
+.rm-btn.primary:hover { filter: brightness(1.2); }
+
+/* 다크 테마 — 크림 대신 어두운 톤 유지 (패널보다 입력이 밝게) */
+:root[data-theme="dark"] .room-modal { background: #29231d; border-color: #3d342a; }
+:root[data-theme="dark"] .rm-input { background: #352d24; border-color: #45392d; }
+:root[data-theme="dark"] .rm-input:focus { background: #3d3329; }
+:root[data-theme="dark"] .rm-btn.ghost { background: #352d24; border-color: #45392d; }
+:root[data-theme="dark"] .rm-btn.ghost:hover { background: #3d3329; }
 
 /* ---------- 방(대기실) 화면 ---------- */
 .room-head-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
