@@ -149,7 +149,7 @@ function createVowelGame(io, room, config) {
     io.to(room.id).emit("vowel:progress", {
       solvedCount: cur.solvers.length,
       total: activeCount(),
-      solvers: cur.solvers.map((s) => ({ name: s.name, rank: s.rank, points: s.points })),
+      solvers: cur.solvers.map((s) => ({ id: s.id, name: s.name, rank: s.rank, points: s.points })),
       scores: scoreboard(),
     });
 

@@ -41,6 +41,7 @@
 
       let round = null;       // { index, total, jamo, difficultyLabel, solutionCount, timeLimit }
       let remain = 0, ticker = null, mySolved = false, scores = [];
+      let solvedIds = new Set(); // 이번 라운드에서 이미 정답을 맞힌 플레이어 id
 
       const stopTicker = () => { if (ticker) { clearInterval(ticker); ticker = null; } };
       const $ = (sel) => container.querySelector(sel);
@@ -67,6 +68,7 @@
                   <button class="btn primary" id="vm-submit">제출</button>
                 </div>
                 <div class="vg-result" id="vm-result"></div>
+                <div class="vm-reveal" id="vm-reveal" hidden></div>
               </div>
               <aside class="vm-score" id="vm-score"></aside>
             </div>
@@ -94,9 +96,23 @@
       function paintScores() {
         const box = $("#vm-score");
         if (!box) return;
-        box.innerHTML = `<div class="vm-score-h">점수</div>` + scores.map((s, i) =>
-          `<div class="vm-score-row"><span class="vm-rank">${medal(i)}</span><span class="vm-name">${escape(s.name)}</span><span class="vm-pts">${s.score}</span></div>`
-        ).join("");
+        const header = `
+          <div class="vm-score-h-row">
+            <span class="vm-rank"></span>
+            <span class="vm-status"></span>
+            <span class="vm-name">참가자</span>
+            <span class="vm-pts">점수</span>
+          </div>`;
+        box.innerHTML = header + scores.map((s, i) => {
+          const solved = solvedIds.has(s.id);
+          return `
+            <div class="vm-score-row ${solved ? "solved" : "pending"}">
+              <span class="vm-rank">${medal(i)}</span>
+              <span class="vm-status" title="${solved ? "이번 문제 정답" : "아직 못 맞힘"}">${solved ? "✔" : "…"}</span>
+              <span class="vm-name">${escape(s.name)}</span>
+              <span class="vm-pts">${s.score}</span>
+            </div>`;
+        }).join("");
       }
 
       function submit() {
@@ -132,6 +148,7 @@
       const onRound = (data) => {
         round = data;
         scores = data.scores || scores;
+        solvedIds = new Set();
         remain = data.timeLimit;
         renderRound();
         startTicker();
@@ -142,6 +159,7 @@
       };
       const onProgress = (data) => {
         scores = data.scores || scores;
+        solvedIds = new Set((data.solvers || []).map((s) => s.id));
         const s = $("#vm-solved"); if (s) s.textContent = data.solvedCount;
         const t = $("#vm-total"); if (t) t.textContent = data.total;
         paintScores();
@@ -163,17 +181,25 @@
       const onReveal = (data) => {
         stopTicker();
         scores = data.scores || scores;
+        // 라운드 종료 — 아직 제출 안 한 사람도 더 이상 입력 불가
+        const input = $("#vm-input"); if (input) input.disabled = true;
+        const btn = $("#vm-submit"); if (btn) btn.disabled = true;
+
         const answers = (data.answers || []).slice(0, 8).map((w) => `<span class="vm-ans">${escape(w)}</span>`).join("");
         const rs = (data.roundScores || []);
         const rsHtml = rs.length
           ? rs.map((r) => `<div class="vm-rs-row" title="${escape(breakdownText(r.breakdown))}"><span>${r.rank}등 ${escape(r.name)}</span><span>+${r.points}</span></div>`).join("")
           : `<div class="vm-rs-row"><span class="sys">아무도 못 맞혔어요</span></div>`;
-        overlay(`
-          <div class="big">${data.reason === "allSolved" ? "✅" : "⏱️"}</div>
-          <h2>정답 공개</h2>
-          <div class="vm-answers">${answers}</div>
-          <div class="vm-rs">${rsHtml}</div>
-          <p class="vm-next">${data.index >= data.total ? "결과 집계 중…" : "다음 문제로…"}</p>`);
+
+        const el = $("#vm-reveal");
+        if (el) {
+          el.hidden = false;
+          el.innerHTML = `
+            <div class="vm-reveal-head">${data.reason === "allSolved" ? "✅ 모두 정답!" : "⏱️ 시간 종료"} · 정답 공개</div>
+            <div class="vm-answers">${answers}</div>
+            <div class="vm-rs">${rsHtml}</div>
+            <div class="vm-next">${data.index >= data.total ? "결과 집계 중…" : "다음 문제로 넘어갑니다…"}</div>`;
+        }
       };
       const onGameover = (data) => {
         stopTicker();
