@@ -313,13 +313,15 @@
 
     const scroll = el.querySelector("#chat-scroll");
     const input = el.querySelector("#chat-input");
+    const isMine = (m) => !m.sys && m.user === DISPLAY_NAME;
     function paint() {
-      scroll.innerHTML = net.chat.map((m) => {
+      // 내 메시지를 맨 위에 고정, 나머지는 원래(시간순) 순서 유지 (안정 정렬)
+      const ordered = [...net.chat].sort((a, b) => isMine(b) - isMine(a));
+      scroll.innerHTML = ordered.map((m) => {
         if (m.sys) return `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`;
-        const me = m.user === DISPLAY_NAME;
+        const me = isMine(m);
         return `<div class="chat-line${me ? " me" : ""}"><span class="u">${escape(m.user)}${me ? " (나)" : ""}</span>${escape(m.text)}</div>`;
       }).join("");
-      scroll.scrollTop = scroll.scrollHeight;
     }
     function submit() {
       const v = input.value.trim();
