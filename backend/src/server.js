@@ -5,6 +5,7 @@ const { migrate } = require("./db");
 const { attachRealtime } = require("./realtime/rooms");
 const signupRouter = require("./routes/signup");
 const loginRouter = require("./routes/login");
+const oauthRouter = require("./routes/oauth");
 const jamoApi = require("./vowel_game/api");
 
 const PORT = process.env.PORT || 8080;
@@ -17,6 +18,9 @@ app.get("/health", (req, res) => res.type("text").send("ok"));
 // 로그인/회원가입 API (PostgreSQL)
 app.use("/api", signupRouter);
 app.use("/api", loginRouter);
+
+// 소셜 로그인 (카카오/구글/네이버)
+app.use("/auth", oauthRouter);
 
 // 게임 API — 자음 모음 조합 (PostgreSQL)
 app.use("/api/games/jamo", jamoApi);

@@ -5,13 +5,24 @@
 CREATE TABLE IF NOT EXISTS users (
   id            BIGSERIAL PRIMARY KEY,
   username      TEXT     NOT NULL,          -- 로그인 아이디
-  email         TEXT     NOT NULL,
-  password_hash TEXT     NOT NULL,          -- bcrypt 해시
+  email         TEXT,                       -- 소셜 로그인은 이메일 동의항목이 없을 수 있어 NULL 허용
+  password_hash TEXT,                       -- bcrypt 해시 (소셜 로그인 계정은 NULL)
   nickname      TEXT     NOT NULL,
+  provider      TEXT     NOT NULL DEFAULT 'local',  -- 'local' | 'kakao' | 'google' | 'naver'
+  provider_id   TEXT,                       -- 소셜 플랫폼이 부여한 고유 ID (local 계정은 NULL)
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (username)
 );
+
+-- 기존 테이블에 이미 만들어져 있던 환경을 위한 보정(idempotent)
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'local';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS provider_id TEXT;
+
+-- provider+provider_id 중복 가입 방지 (local 계정은 provider_id가 NULL이라 서로 충돌하지 않음)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_provider_account ON users (provider, provider_id);
 
 -- 플레이 기록 (모든 게임 공용). puzzle_id 는 게임별 문제 식별자(FK 없음: 게임 독립성 유지)
 CREATE TABLE IF NOT EXISTS game_results (

@@ -960,10 +960,20 @@
       }
     });
     shell.querySelector("#btn-signup").addEventListener("click", openSignup);
-    shell.querySelectorAll(".social-btn").forEach((b) => b.addEventListener("click", () => {
-      const prov = b.classList.contains("kakao") ? "카카오" : b.classList.contains("naver") ? "네이버" : "Google";
-      toast(`${prov} 로그인은 백엔드 연동 후 제공됩니다.`);
-    }));
+    shell.querySelectorAll(".social-btn").forEach((b) => {
+      if (b.classList.contains("kakao")) {
+        b.addEventListener("click", () => { location.href = "/auth/kakao"; });
+        return;
+      }
+      if (b.classList.contains("google")) {
+        b.addEventListener("click", () => { location.href = "/auth/google"; });
+        return;
+      }
+      if (b.classList.contains("naver")) {
+        b.addEventListener("click", () => { location.href = "/auth/naver"; });
+        return;
+      }
+    });
     return shell;
   }
 
@@ -1037,8 +1047,20 @@
   }
 
   // ---------- boot ----------
+  const bootParams = new URLSearchParams(location.search);
+  const tokenFromUrl = bootParams.get("token");
+  if (tokenFromUrl) {
+    localStorage.setItem("mgh.token", tokenFromUrl);
+    GUEST_ID = bootParams.get("username") || GUEST_ID;
+    localStorage.setItem("mgh.username", GUEST_ID);
+    DISPLAY_NAME = bootParams.get("nickname") || GUEST_ID;
+    localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+    history.replaceState(null, "", location.pathname + location.hash);
+  }
+
   const initial = (location.hash || "").replace("#", "");
   if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel"].includes(initial)) state.view = initial;
+  if (tokenFromUrl) state.view = "lobby";
   render();
 
   // BGM이 켜진 상태로 저장돼 있으면, 브라우저 자동재생 정책상 첫 클릭에서 재생 시작
