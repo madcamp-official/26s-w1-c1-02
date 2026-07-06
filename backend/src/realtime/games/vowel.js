@@ -2,7 +2,8 @@
 // 방 하나당 인스턴스 하나. rooms.js 가 room:start 시 생성하고 room.game 에 붙인다.
 //
 // 흐름: nextRound → (제출 검증·채점) → endRound(전원정답 or 타임아웃) → reveal → 다음/종료
-// 점수: 순위 기반, 맞힌 사람 전원 득점. 힌트: 제한시간 2/3 경과 시 정답 첫 음절 공개.
+// 점수: 등수 + 그 단어의 난이도(자모 개수) + 절대 속도(남은 시간) 세 축을 합산.
+//   맞힌 사람 전원 득점. 힌트: 제한시간 2/3 경과 시 정답 첫 음절 공개.
 const puzzle = require("../../vowel_game/puzzle");
 
 // 난이도(4단계) → 출제 음절 수 범위
@@ -12,14 +13,27 @@ const MP_DIFF = {
   3: { label: "어려움", syl: [3, 4] },
   4: { label: "세종대왕", syl: [4, 4] },
 };
-const RANK_POINTS = [100, 80, 65, 55]; // 1~4등, 5등+ 는 아래 상수
-const LATE_POINTS = 50;
 const REVEAL_MS = 4000; // 정답 공개 후 다음 라운드까지 대기
+
+// ---- 점수 공식: 기본 + 등수 보너스 + 난이도 보너스 + 절대 속도 보너스 ----
+const BASE_POINTS = 20;
+const RANK_BONUS = [40, 25, 15, 10]; // 1~4등, 5등+ 는 0 (그래도 아래 두 보너스는 그대로 받음)
+const POINTS_PER_JAMO = 4;   // 그 단어를 이루는 자모 개수(=경우의 수/난이도) × 4
+const POINTS_PER_SEC_LEFT = 2; // 라운드 시작 후 남은 시간(초, 등수와 무관) × 2
 
 const clampDiff = (d) => (MP_DIFF[d] ? d : 2);
 const clampRounds = (n) => Math.min(20, Math.max(3, parseInt(n, 10) || 8));
 const timeLimitFor = (syl) => 12 + syl * 6; // 초. 2음절=24, 3=30, 4=36
-const pointsForRank = (rank) => (rank <= RANK_POINTS.length ? RANK_POINTS[rank - 1] : LATE_POINTS);
+
+// 등수·자모 개수(단어별 난이도)·절대 경과시간을 합산해 점수 산출. 클라이언트 표시용 breakdown 동봉.
+function scoreBreakdown({ rank, jamoCount, elapsedSec, timeLimit }) {
+  const rankBonus = rank <= RANK_BONUS.length ? RANK_BONUS[rank - 1] : 0;
+  const difficultyBonus = jamoCount * POINTS_PER_JAMO;
+  const secLeft = Math.max(0, timeLimit - elapsedSec);
+  const speedBonus = Math.round(secLeft * POINTS_PER_SEC_LEFT);
+  const total = BASE_POINTS + rankBonus + difficultyBonus + speedBonus;
+  return { base: BASE_POINTS, rankBonus, difficultyBonus, speedBonus, total };
+}
 
 // 단어 첫 음절만 남기고 나머지는 ○ 로 가리는 힌트 문자열. 예: "도서관" → "도○○"
 function maskHint(word) {
@@ -124,16 +138,18 @@ function createVowelGame(io, room, config) {
     }
 
     const rank = cur.solvers.length + 1;
-    const points = pointsForRank(rank);
+    const elapsedSec = (Date.now() - cur.startedAt) / 1000;
+    const breakdown = scoreBreakdown({ rank, jamoCount: cur.jamo.length, elapsedSec, timeLimit: cur.timeLimit });
+    const points = breakdown.total;
     const entry = scores.get(socketId);
     entry.score += points;
-    cur.solvers.push({ id: socketId, name: entry.name, rank, points });
+    cur.solvers.push({ id: socketId, name: entry.name, rank, points, breakdown });
 
-    io.to(socketId).emit("vowel:result", { correct: true, word: clean, rank, points });
+    io.to(socketId).emit("vowel:result", { correct: true, word: clean, rank, points, breakdown });
     io.to(room.id).emit("vowel:progress", {
       solvedCount: cur.solvers.length,
       total: activeCount(),
-      solvers: cur.solvers.map((s) => ({ name: s.name, rank: s.rank })),
+      solvers: cur.solvers.map((s) => ({ name: s.name, rank: s.rank, points: s.points })),
       scores: scoreboard(),
     });
 
@@ -153,7 +169,7 @@ function createVowelGame(io, room, config) {
       total: totalRounds,
       reason,
       answers: answers.length ? answers : [cur.word],
-      roundScores: cur.solvers.map((s) => ({ name: s.name, rank: s.rank, points: s.points })),
+      roundScores: cur.solvers.map((s) => ({ name: s.name, rank: s.rank, points: s.points, breakdown: s.breakdown })),
       scores: scoreboard(),
     });
 

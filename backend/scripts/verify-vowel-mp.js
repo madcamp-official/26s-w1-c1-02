@@ -92,6 +92,14 @@ function mkClient(name) {
   check(!!hostWrong, "오답 제출 시 correct:false 응답");
   const hostRight = host.ev.results.find((r) => r.correct === true);
   check(hostRight && hostRight.rank === 1, `호스트 정답 1등 (rank=${hostRight && hostRight.rank}, +${hostRight && hostRight.points})`);
+  check(hostRight && hostRight.breakdown && hostRight.breakdown.rankBonus === 40,
+    `1등 breakdown.rankBonus=40 (실제 ${hostRight && hostRight.breakdown && hostRight.breakdown.rankBonus})`);
+  check(hostRight && hostRight.breakdown && hostRight.breakdown.total === hostRight.points,
+    "breakdown.total == points 일관성");
+  check(hostRight && hostRight.breakdown && hostRight.breakdown.difficultyBonus > 0,
+    `단어 난이도(자모 개수) 보너스 반영 (+${hostRight && hostRight.breakdown && hostRight.breakdown.difficultyBonus})`);
+  check(hostRight && hostRight.breakdown && hostRight.breakdown.speedBonus > 0,
+    `절대 속도 보너스 반영 (+${hostRight && hostRight.breakdown && hostRight.breakdown.speedBonus})`);
   check(!!host.ev.gameover, "vowel:gameover 수신");
   if (host.ev.gameover) {
     const fs = host.ev.gameover.finalScores;
