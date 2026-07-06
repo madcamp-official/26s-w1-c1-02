@@ -1,5 +1,6 @@
 // 멀티플레이 로비: 방 생성/참가/비밀방/방장 모드 변경 (in-memory, DB 미사용 — 휘발성 상태)
 const { Server } = require("socket.io");
+const { createVowelGame, clampDiff, clampRounds } = require("./games/vowel");
 
 const MODES = [
   { id: "spot", label: "다른그림찾기" },
@@ -43,6 +44,8 @@ function attachRealtime(server) {
     cur: room.players.length,
     max: room.maxPlayers,
     state: room.state,
+    difficulty: room.difficulty,
+    rounds: room.rounds,
   });
 
   const roomState = (room) => ({
@@ -53,8 +56,20 @@ function attachRealtime(server) {
     maxPlayers: room.maxPlayers,
     state: room.state,
     hostId: room.hostId,
+    difficulty: room.difficulty,
+    rounds: room.rounds,
     players: room.players.map((p) => ({ id: p.id, name: p.name, ready: !!p.ready })),
   });
+
+  // 게임 종료 → 방을 대기실로 되돌리고 게임 인스턴스 정리
+  function endGame(room) {
+    if (room.game) { room.game.dispose(); room.game = null; }
+    if (room.state === "play") {
+      room.state = "wait";
+      broadcastRoomState(room);
+      broadcastRoomList();
+    }
+  }
 
   // 서버에 실시간 접속 중인 전체 플레이어 목록 (방 참여 여부 무관)
   const broadcastPresence = () => {
@@ -76,7 +91,9 @@ function attachRealtime(server) {
     if (!room) return;
 
     room.players = room.players.filter((p) => p.id !== socket.id);
+    if (room.game) room.game.onPlayerLeave(socket.id);
     if (room.players.length === 0) {
+      if (room.game) { room.game.dispose(); room.game = null; }
       rooms.delete(roomId);
       broadcastRoomList();
       return;
@@ -125,6 +142,9 @@ function attachRealtime(server) {
       const password = isPrivate ? sanitize(payload && payload.password, 32) : "";
       if (isPrivate && !password) return cb({ ok: false, message: "비밀방은 비밀번호를 입력해주세요." });
 
+      const difficulty = clampDiff(payload && payload.difficulty);
+      const rounds = clampRounds(payload && payload.rounds);
+
       leaveRoom(socket);
 
       const room = {
@@ -133,9 +153,12 @@ function attachRealtime(server) {
         mode,
         password,
         maxPlayers,
+        difficulty,
+        rounds,
         state: "wait",
         hostId: socket.id,
         hostName: socket.data.name,
+        game: null,
         players: [{ id: socket.id, name: socket.data.name, ready: true }],
       };
       rooms.set(room.id, room);
@@ -151,6 +174,7 @@ function attachRealtime(server) {
       const roomId = sanitize(payload && payload.roomId, 12).toUpperCase();
       const room = rooms.get(roomId);
       if (!room) return cb({ ok: false, message: "존재하지 않는 방입니다." });
+      if (room.state === "play") return cb({ ok: false, message: "게임이 진행 중입니다." });
       if (room.players.length >= room.maxPlayers) return cb({ ok: false, message: "방 인원이 가득 찼습니다." });
       if (room.password && room.password !== sanitize(payload && payload.password, 32)) {
         return cb({ ok: false, message: "비밀번호가 올바르지 않습니다." });
@@ -183,6 +207,16 @@ function attachRealtime(server) {
       broadcastRoomList();
     });
 
+    // 방장 전용: 난이도(1~4) / 문제 수(3~20) 변경 — 대기 상태에서만
+    socket.on("room:setConfig", (payload) => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || room.hostId !== socket.id || room.state !== "wait") return;
+      room.difficulty = clampDiff(payload && payload.difficulty);
+      room.rounds = clampRounds(payload && payload.rounds);
+      broadcastRoomState(room);
+      broadcastRoomList();
+    });
+
     socket.on("room:ready", () => {
       const room = rooms.get(socket.data.roomId);
       if (!room || room.hostId === socket.id) return; // 방장은 준비 토글 없음
@@ -196,18 +230,37 @@ function attachRealtime(server) {
       const room = rooms.get(socket.data.roomId);
       if (!room || room.hostId !== socket.id) return;
       if (room.state === "wait") {
+        // 전원 준비 완료 필수 (방장 제외)
         const allReady = room.players.every((p) => p.id === room.hostId || p.ready);
         if (!allReady) {
           socket.emit("room:notice", "아직 준비하지 않은 참가자가 있습니다.");
           return;
         }
+        if (room.mode === "vowel" && room.players.length < 2) {
+          socket.emit("room:notice", "2명 이상이 있어야 시작할 수 있습니다.");
+          return;
+        }
         room.state = "play";
+        roomSystemMessage(room, "게임이 시작되었습니다.");
+        broadcastRoomState(room);
+        broadcastRoomList();
+        // 자음·모음 조합 모드는 실시간 게임 엔진 구동 (그 외 모드는 상태 토글만)
+        if (room.mode === "vowel") {
+          room.onGameEnd = () => endGame(room);
+          room.game = createVowelGame(io, room, { difficulty: room.difficulty, rounds: room.rounds });
+          room.game.start();
+        }
       } else {
-        room.state = "wait";
+        endGame(room); // play → wait: 게임 정리 후 대기실로
+        roomSystemMessage(room, "대기실로 돌아왔습니다.");
       }
-      roomSystemMessage(room, room.state === "play" ? "게임이 시작되었습니다." : "대기실로 돌아왔습니다.");
-      broadcastRoomState(room);
-      broadcastRoomList();
+    });
+
+    // 자음·모음 조합 멀티플레이: 단어 제출
+    socket.on("vowel:submit", (payload) => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || !room.game) return;
+      room.game.submit(socket.id, payload && payload.word);
     });
 
     socket.on("room:chat", (text) => {

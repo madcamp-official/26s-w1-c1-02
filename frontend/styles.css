@@ -349,6 +349,35 @@ select.rm-input { appearance: none; cursor: pointer; }
 .modal p { color: var(--ink-soft); margin: 0 0 20px; }
 .modal .row { display: flex; gap: 10px; justify-content: center; }
 
+/* ---------- Multiplayer vowel (실시간 대전) ---------- */
+.vm-wrap { max-width: 860px; margin: 0 auto; }
+.vm-waiting { text-align: center; color: var(--muted); padding: 60px 0; }
+.vm-top { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+.vm-solvedbar { font-size: 14px; color: var(--ink-soft); }
+.vm-solvedbar b { color: var(--accent); font-size: 18px; }
+.vm-main { display: grid; grid-template-columns: 1fr 200px; gap: 18px; align-items: start; }
+.vm-hint { text-align: center; margin: 4px 0 14px; color: var(--ink-soft); font-size: 15px; letter-spacing: 2px; }
+.vm-hint b { color: var(--accent); }
+.vm-score { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; }
+.vm-score-h { font-weight: 800; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.vm-score-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.vm-score-row:first-of-type { border-top: none; }
+.vm-rank { width: 24px; text-align: center; }
+.vm-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-pts { font-weight: 800; color: var(--accent); }
+.vm-modal { max-width: 420px; }
+.vm-answers { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 16px; }
+.vm-ans { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 5px 14px; font-weight: 700; }
+.vm-rs { text-align: left; max-width: 260px; margin: 0 auto; }
+.vm-rs-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; color: var(--ink-soft); }
+.vm-next { margin-top: 16px !important; font-size: 13px; color: var(--muted); }
+.vm-final { margin-bottom: 18px; }
+.vm-final-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; font-size: 15px; }
+.vm-final-row.win { background: var(--accent-soft); }
+.vm-final-row .vm-pts { font-size: 16px; }
+.room-start-hint { text-align: center; color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
+@media (max-width: 720px) { .vm-main { grid-template-columns: 1fr; } }
+
 /* ---------- Login screen ---------- */
 .login-shell {
   min-height: 100dvh; display: flex; flex-direction: column;
