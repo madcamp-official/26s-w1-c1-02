@@ -29,10 +29,9 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       - PORT=8080
-      # 게임(자음 모음 조합) — 로컬 Postgres
+      # 계정 + 게임 데이터 — 단일 Postgres
       - DATABASE_URL=postgres://mgh:mgh_dev_pw@db:5432/minigameheaven
-      # 로그인/회원가입 — MongoDB Atlas + JWT
-      - MONGO_URI=${MONGO_URI}
+      # 로그인 토큰 서명용 (아무 랜덤 문자열)
       - JWT_SECRET=${JWT_SECRET}
       # 국립국어원 표준국어대사전 API 키 (선택) — 로컬 DB에 없는 단어 폴백 검증용
       - STDICT_API_KEY=${STDICT_API_KEY:-}
