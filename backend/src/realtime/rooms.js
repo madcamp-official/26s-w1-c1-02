@@ -21,8 +21,12 @@ function sanitize(s, maxLen) {
   return String(s == null ? "" : s).trim().slice(0, maxLen);
 }
 
+// 방 코드용 문자셋: 생김새가 헷갈리는 0/O, 1/I/L 을 제외
+const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 function makeRoomId() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+  let id = "";
+  for (let i = 0; i < 6; i++) id += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  return id;
 }
 
 function attachRealtime(server) {
