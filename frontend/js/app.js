@@ -313,15 +313,13 @@
 
     const scroll = el.querySelector("#chat-scroll");
     const input = el.querySelector("#chat-input");
-    const isMine = (m) => !m.sys && m.user === DISPLAY_NAME;
     function paint() {
-      // 내 메시지를 맨 위에 고정, 나머지는 원래(시간순) 순서 유지 (안정 정렬)
-      const ordered = [...net.chat].sort((a, b) => isMine(b) - isMine(a));
-      scroll.innerHTML = ordered.map((m) => {
-        if (m.sys) return `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`;
-        const me = isMine(m);
-        return `<div class="chat-line${me ? " me" : ""}"><span class="u">${escape(m.user)}${me ? " (나)" : ""}</span>${escape(m.text)}</div>`;
-      }).join("");
+      scroll.innerHTML = net.chat.map((m) =>
+        m.sys
+          ? `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`
+          : `<div class="chat-line"><span class="u">${escape(m.user)}</span>${escape(m.text)}</div>`
+      ).join("");
+      scroll.scrollTop = scroll.scrollHeight;
     }
     function submit() {
       const v = input.value.trim();
@@ -355,7 +353,9 @@
         return;
       }
       const myId = net.socket && net.socket.id;
-      scroll.innerHTML = users.map((u) => {
+      // 나를 항상 목록 맨 위로 고정 (안정 정렬)
+      const ordered = [...users].sort((a, b) => (b.id === myId) - (a.id === myId));
+      scroll.innerHTML = ordered.map((u) => {
         const name = u.name || "손님";
         const me = u.id && u.id === myId;
         return `<div class="user-row"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
