@@ -194,6 +194,8 @@ button { font-family: inherit; cursor: pointer; }
 .rm-input::placeholder { color: var(--muted); font-weight: 500; }
 .rm-input:focus { outline: none; border-color: var(--accent); background: #fffdf6; }
 select.rm-input { appearance: none; cursor: pointer; }
+.rm-upper { text-transform: uppercase; letter-spacing: .08em; }
+.rm-upper::placeholder { text-transform: none; letter-spacing: normal; }
 .rm-slider-label { font-size: 14px; font-weight: 800; color: var(--ink); }
 .rm-slider-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .rm-toggle-row { display: flex; align-items: center; justify-content: space-between; }

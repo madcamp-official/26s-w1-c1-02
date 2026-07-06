@@ -532,7 +532,7 @@
           <div class="room-modal-head"><h2>방 참가</h2><button type="button" class="settings-close" title="닫기">✕</button></div>
           <div class="rm-field">
             <label for="rj-code">방 코드</label>
-            <input class="rm-input" id="rj-code" placeholder="방 코드를 입력하세요" maxlength="12" />
+            <input class="rm-input rm-upper" id="rj-code" placeholder="방 코드를 입력하세요" maxlength="12" autocapitalize="characters" />
           </div>
           <div class="rm-field">
             <label for="rj-password">비밀번호</label>
@@ -550,9 +550,17 @@
     o.querySelector(".settings-close").addEventListener("click", close);
     o.querySelector("#rj-cancel").addEventListener("click", close);
 
+    // 방 코드 입력 시 자동으로 대문자 변환
+    const codeInput = o.querySelector("#rj-code");
+    codeInput.addEventListener("input", () => {
+      const start = codeInput.selectionStart;
+      codeInput.value = codeInput.value.toUpperCase();
+      codeInput.setSelectionRange(start, start);
+    });
+
     o.querySelector("#room-join-form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const roomId = o.querySelector("#rj-code").value.trim();
+      const roomId = o.querySelector("#rj-code").value.trim().toUpperCase();
       if (!roomId) { toast("방 코드를 입력해주세요."); return; }
       const password = o.querySelector("#rj-password").value;
       const res = await net.joinRoom({ roomId, password });
@@ -759,10 +767,9 @@
           </div>
         </div>
         <div class="room-info-line">
-          <span class="room-info-name"># 방 이름 : ${escape(room.name)}</span>
           ${isHost ? "" : `<span class="room-mode-tag">${escape(modeLabel(room.mode))}</span>`}
           <span class="state ${room.state === "wait" ? "wait" : "play"}">${room.state === "wait" ? "대기중" : "게임중"}</span>
-          <span class="room-info-meta">코드 ${escape(room.id)}${room.locked ? " · 🔒" : ""} · ${room.players.length}/${room.maxPlayers}</span>
+          <span class="room-info-meta">코드 ${escape(String(room.id).toUpperCase())}${room.locked ? " · 🔒" : ""} · ${room.players.length}/${room.maxPlayers}</span>
         </div>
         <div class="room-slots">${slots}${emptySlots}</div>`;
 

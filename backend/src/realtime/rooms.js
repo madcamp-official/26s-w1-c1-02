@@ -22,7 +22,7 @@ function sanitize(s, maxLen) {
 }
 
 function makeRoomId() {
-  return Math.random().toString(36).slice(2, 8);
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
 function attachRealtime(server) {
@@ -137,7 +137,8 @@ function attachRealtime(server) {
 
     socket.on("room:join", (payload, cb) => {
       cb = typeof cb === "function" ? cb : () => {};
-      const room = rooms.get(payload && payload.roomId);
+      const roomId = sanitize(payload && payload.roomId, 12).toUpperCase();
+      const room = rooms.get(roomId);
       if (!room) return cb({ ok: false, message: "존재하지 않는 방입니다." });
       if (room.players.length >= room.maxPlayers) return cb({ ok: false, message: "방 인원이 가득 찼습니다." });
       if (room.password && room.password !== sanitize(payload && payload.password, 32)) {
