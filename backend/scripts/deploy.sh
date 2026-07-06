@@ -18,6 +18,8 @@ cp "$FRONTEND/index.html"            "$WEB_ROOT/index.html"
 cp "$FRONTEND/styles.css"            "$WEB_ROOT/styles.css"
 cp "$FRONTEND/js/app.js"             "$WEB_ROOT/js/app.js"
 cp "$FRONTEND/js/spot-difference.js" "$WEB_ROOT/js/spot-difference.js"
+cp "$FRONTEND/js/vowel-game.js"      "$WEB_ROOT/js/vowel-game.js"
+cp "$FRONTEND/js/vowel-multi.js"     "$WEB_ROOT/js/vowel-multi.js"
 
 echo "▶ nginx 설정 동기화 & reload"
 cp "$NGINX_CONF_SRC" "$NGINX_CONF_DST"

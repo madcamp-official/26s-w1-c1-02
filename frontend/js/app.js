@@ -27,17 +27,17 @@
       desc: "다양한 주제의 상식 문제로 두뇌를 깨워보세요.", lv: 5, done: 4, total: 18 },
   ];
 
-  const USERS = ["하늘별", "퀵마스터", "달빛토끼", "English99", "번개", "소나기", "그림자", "별빛달", "초록숲", "무지개"];
-
   function modeLabel(id) {
     const m = net.modes.find((x) => x.id === id);
     return m ? m.label : id;
   }
 
+  const DIFF_LABEL = { 1: "쉬움", 2: "보통", 3: "어려움", 4: "세종대왕" };
+
   // ---- realtime: 로비 채팅 + 멀티플레이 방 (Socket.IO) ----
   const net = {
     socket: null, connected: false, listeners: new Set(),
-    modes: [], rooms: [], room: null,
+    modes: [], rooms: [], room: null, presence: [],
     chat: [{ sys: true, text: "미니게임천국 로비에 오신 것을 환영합니다 🎉" }],
     roomChat: [],
     connect() {
@@ -48,6 +48,7 @@
       socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
       socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
       socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
+      socket.on("presence", (users) => { this.presence = users; this.emit(); });
       socket.on("room:state", (room) => { this.room = room; this.emit(); });
       socket.on("chat:history", (msgs) => { this.chat.push(...msgs); this.emit(); });
       socket.on("chat:message", (msg) => { this.pushChat(msg); });
@@ -76,6 +77,7 @@
       return new Promise((res) => this.socket.emit("room:leave", res));
     },
     setMode(mode) { if (this.socket) this.socket.emit("room:setMode", mode); },
+    setConfig(cfg) { if (this.socket) this.socket.emit("room:setConfig", cfg); },
     toggleReady() { if (this.socket) this.socket.emit("room:ready"); },
     toggleStart() { if (this.socket) this.socket.emit("room:start"); },
     emit() { this.listeners.forEach((fn) => fn()); },
@@ -338,14 +340,36 @@
   }
 
   function sidebarUsers() {
-    const rows = USERS.map((u) =>
-      `<div class="user-row"><div class="av" style="background:${avColor(u)}">${u[0]}</div>${escape(u)}</div>`
-    ).join("");
-    return h(`
+    const el = h(`
       <aside class="sidebar">
-        <div class="side-head"><div class="t">👥 접속자</div><div class="c">${state.online + USERS.length}명</div></div>
-        <div class="side-scroll">${rows}<div class="chat-line"><span class="sys">+ 다른 접속자들</span></div></div>
+        <div class="side-head"><div class="t">👥 접속자</div><div class="c" id="users-count">0명</div></div>
+        <div class="side-scroll" id="users-scroll"></div>
       </aside>`);
+
+    const scroll = el.querySelector("#users-scroll");
+    const count = el.querySelector("#users-count");
+    function paint() {
+      const users = net.presence;
+      count.textContent = `${users.length}명`;
+      if (!users.length) {
+        scroll.innerHTML = `<div class="chat-line"><span class="sys">${net.connected ? "접속 중인 플레이어가 없습니다" : "오프라인 모드"}</span></div>`;
+        return;
+      }
+      const myId = net.socket && net.socket.id;
+      // 나를 항상 목록 맨 위로 고정 (안정 정렬)
+      const ordered = [...users].sort((a, b) => (b.id === myId) - (a.id === myId));
+      scroll.innerHTML = ordered.map((u) => {
+        const name = u.name || "손님";
+        const me = u.id && u.id === myId;
+        return `<div class="user-row"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
+      }).join("");
+    }
+
+    const listener = () => paint();
+    net.listeners.add(listener);
+    el._cleanup = () => net.listeners.delete(listener);
+    paint();
+    return el;
   }
 
   function lobbyView() {
@@ -376,7 +400,7 @@
           </button>
         </div>
       </div>`);
-    return [content, sidebarChat()];
+    return [content, null];
   }
 
   function soloView() {
@@ -467,6 +491,18 @@
               ${modes.map((m) => `<option value="${m.id}">${escape(m.label)}</option>`).join("")}
             </select>
           </div>
+          <div class="rm-field vowel-cfg" id="rc-vowel-cfg" hidden>
+            <label for="rc-diff">난이도</label>
+            <select class="rm-input" id="rc-diff">
+              <option value="1">쉬움</option>
+              <option value="2" selected>보통</option>
+              <option value="3">어려움</option>
+              <option value="4">세종대왕</option>
+            </select>
+            <div class="rm-slider-label" style="margin-top:12px">문제 수: <span id="rc-rounds-val">8</span>개</div>
+            <input type="range" min="3" max="20" step="1" value="8" id="rc-rounds" />
+            <div class="rm-slider-ends"><span>3개</span><span>20개</span></div>
+          </div>
           <div class="rm-field">
             <div class="rm-slider-label">최대 인원: <span id="rc-max-val">6</span>명</div>
             <input type="range" min="2" max="8" step="1" value="6" id="rc-max" />
@@ -492,6 +528,15 @@
     const maxSlider = o.querySelector("#rc-max"), maxVal = o.querySelector("#rc-max-val");
     maxSlider.addEventListener("input", () => { maxVal.textContent = maxSlider.value; });
 
+    // 자음·모음 조합 모드에서만 난이도/문제 수 노출
+    const modeSel = o.querySelector("#rc-mode");
+    const vowelCfg = o.querySelector("#rc-vowel-cfg");
+    const roundsSlider = o.querySelector("#rc-rounds"), roundsVal = o.querySelector("#rc-rounds-val");
+    roundsSlider.addEventListener("input", () => { roundsVal.textContent = roundsSlider.value; });
+    const syncVowelCfg = () => { vowelCfg.hidden = modeSel.value !== "vowel"; };
+    modeSel.addEventListener("change", syncVowelCfg);
+    syncVowelCfg();
+
     let isPrivate = false;
     const privSwitch = o.querySelector("#rc-private");
     const pwInput = o.querySelector("#rc-password");
@@ -510,7 +555,8 @@
       const password = pwInput.value;
       if (isPrivate && !password) { toast("비밀방은 비밀번호를 입력해주세요."); return; }
       const res = await net.createRoom({
-        name, mode: o.querySelector("#rc-mode").value, maxPlayers: +maxSlider.value,
+        name, mode: modeSel.value, maxPlayers: +maxSlider.value,
+        difficulty: +o.querySelector("#rc-diff").value, rounds: +roundsSlider.value,
         private: isPrivate, password,
       });
       if (!res.ok) { toast(res.message || "방 생성에 실패했습니다."); return; }
@@ -711,7 +757,25 @@
     const root = content.querySelector("#room-root");
     let gearOpen = false;
 
+    // 멀티 게임 마운트 상태 (자음·모음 조합 실시간 대전)
+    let gameCleanup = null, gameMounted = false, gameFinished = false;
+    function mountGame() {
+      root.innerHTML = "";
+      gameMounted = true; gameFinished = false;
+      gameCleanup = window.VowelMulti.mount(root, {
+        socket: net.socket,
+        onExit: exitGame,
+        onFinish: () => { gameFinished = true; },
+      });
+    }
+    function unmountGame() {
+      if (gameCleanup) { gameCleanup(); gameCleanup = null; }
+      gameMounted = false; gameFinished = false;
+    }
+    function exitGame() { unmountGame(); paint(); }
+
     function leaveAndGoLobby() {
+      unmountGame();
       net.leaveRoom().then(() => go("multi"));
     }
 
@@ -726,11 +790,32 @@
 
     function paint() {
       const room = net.room;
-      if (!room) { go("multi"); return; }
+      if (!room) { unmountGame(); go("multi"); return; }
+
+      // 자음·모음 조합 게임 진행 중 → 게임 화면을 마운트하고 이후 재렌더는 게임이 자체 관리
+      if (room.state === "play" && room.mode === "vowel") {
+        if (!gameMounted) mountGame();
+        return;
+      }
+      // 대기 상태로 돌아왔는데 게임이 아직 붙어 있으면:
+      //  - 정상 종료(gameFinished): 최종 순위 오버레이 유지 (사용자가 "대기실로" 누를 때까지)
+      //  - 그 외(방장이 중간에 대기실로 되돌림): 게임 정리 후 대기실 렌더
+      if (gameMounted) {
+        if (gameFinished) return;
+        unmountGame();
+      }
+
       const isHost = !!(net.socket && room.hostId === net.socket.id);
       const meId = net.socket && net.socket.id;
+      const isVowel = room.mode === "vowel";
       const modeOptions = (net.modes.length ? net.modes : [{ id: room.mode, label: modeLabel(room.mode) }])
         .map((m) => `<option value="${m.id}"${m.id === room.mode ? " selected" : ""}>${escape(m.label)}</option>`).join("");
+      // 시작 게이트: 방장 제외 전원 준비 + (2명 이상)
+      const others = room.players.filter((p) => p.id !== room.hostId);
+      const allReady = others.every((p) => p.ready);
+      const canStart = room.players.length >= 2 && allReady;
+      const startHint = room.players.length < 2 ? "2명 이상이 필요합니다"
+        : !allReady ? "전원 준비 대기 중" : "";
 
       // 참가자 자리 + 빈 자리(점선 플레이스홀더). 방장=방장, 그 외=준비/대기(본인은 클릭 토글)
       const slots = room.players.map((p) => {
@@ -750,34 +835,52 @@
       const emptyCount = Math.max(0, room.maxPlayers - room.players.length);
       const emptySlots = Array.from({ length: emptyCount }, () => `<div class="slot empty"></div>`).join("");
 
+      const startDisabled = isHost && room.state === "wait" && !canStart;
       root.innerHTML = `
         <div class="page-head room-head">
           <button class="page-back" id="room-back">←</button>
           <div class="page-title">${escape(room.name)}</div>
           <div class="room-head-actions">
-            ${isHost ? `<button class="btn primary" id="room-toggle">${room.state === "wait" ? "게임 시작" : "대기실로"}</button>` : ""}
+            ${isHost ? `<button class="btn primary" id="room-toggle"${startDisabled ? " disabled" : ""}${startHint ? ` title="${escape(startHint)}"` : ""}>${room.state === "wait" ? "게임 시작" : "대기실로"}</button>` : ""}
             ${isHost ? `
             <div class="room-gear-wrap">
-              <button class="nav-icon" id="room-gear" title="게임 모드 설정">⚙️</button>
+              <button class="nav-icon" id="room-gear" title="게임 설정">⚙️</button>
               <div class="room-gear-menu" id="room-gear-menu"${gearOpen ? "" : " hidden"}>
                 <div class="rgm-label">게임 모드</div>
                 <select class="rm-input" id="room-mode">${modeOptions}</select>
+                ${isVowel ? `
+                <div class="rgm-label" style="margin-top:10px">난이도</div>
+                <select class="rm-input" id="room-diff">
+                  ${[1, 2, 3, 4].map((v) => `<option value="${v}"${room.difficulty === v ? " selected" : ""}>${DIFF_LABEL[v]}</option>`).join("")}
+                </select>
+                <div class="rgm-label" style="margin-top:10px">문제 수: <span id="room-rounds-val">${room.rounds}</span>개</div>
+                <input type="range" min="3" max="20" step="1" value="${room.rounds}" id="room-rounds" />` : ""}
               </div>
             </div>` : ""}
           </div>
         </div>
         <div class="room-info-line">
           ${isHost ? "" : `<span class="room-mode-tag">${escape(modeLabel(room.mode))}</span>`}
+          ${isVowel ? `<span class="room-mode-tag">${DIFF_LABEL[room.difficulty] || "?"} · ${room.rounds}문제</span>` : ""}
           <span class="state ${room.state === "wait" ? "wait" : "play"}">${room.state === "wait" ? "대기중" : "게임중"}</span>
           <span class="room-info-meta">코드 ${escape(String(room.id).toUpperCase())}${room.locked ? " · 🔒" : ""} · ${room.players.length}/${room.maxPlayers}</span>
         </div>
+        ${startHint && isHost && room.state === "wait" ? `<div class="room-start-hint">${escape(startHint)}</div>` : ""}
         <div class="room-slots">${slots}${emptySlots}</div>`;
 
       root.querySelector("#room-back").addEventListener("click", leaveAndGoLobby);
       const modeSel = root.querySelector("#room-mode");
       if (modeSel) modeSel.addEventListener("change", () => net.setMode(modeSel.value));
+      const diffSel = root.querySelector("#room-diff");
+      if (diffSel) diffSel.addEventListener("change", () => net.setConfig({ difficulty: +diffSel.value, rounds: room.rounds }));
+      const roundsSlider = root.querySelector("#room-rounds");
+      if (roundsSlider) {
+        const rv = root.querySelector("#room-rounds-val");
+        roundsSlider.addEventListener("input", () => { if (rv) rv.textContent = roundsSlider.value; });
+        roundsSlider.addEventListener("change", () => net.setConfig({ difficulty: room.difficulty, rounds: +roundsSlider.value }));
+      }
       const toggleBtn = root.querySelector("#room-toggle");
-      if (toggleBtn) toggleBtn.addEventListener("click", () => net.toggleStart());
+      if (toggleBtn) toggleBtn.addEventListener("click", () => { if (!toggleBtn.disabled) net.toggleStart(); });
       const gearBtn = root.querySelector("#room-gear");
       if (gearBtn) gearBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -790,7 +893,7 @@
 
     const listener = () => paint();
     net.listeners.add(listener);
-    content._cleanup = () => { net.listeners.delete(listener); document.removeEventListener("click", onDocClick); };
+    content._cleanup = () => { unmountGame(); net.listeners.delete(listener); document.removeEventListener("click", onDocClick); };
     paint();
     return [content, sidebarRoomChat()];
   }
