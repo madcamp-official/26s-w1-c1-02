@@ -352,10 +352,14 @@
         scroll.innerHTML = `<div class="chat-line"><span class="sys">${net.connected ? "접속 중인 플레이어가 없습니다" : "오프라인 모드"}</span></div>`;
         return;
       }
-      scroll.innerHTML = users.map((u) => {
+      const myId = net.socket && net.socket.id;
+      // 나를 항상 맨 위로 고정
+      const ordered = [...users].sort((a, b) => (b.id === myId) - (a.id === myId));
+      scroll.innerHTML = ordered.map((u) => {
         const name = u.name || "손님";
-        const me = u.id && net.socket && u.id === net.socket.id;
-        return `<div class="user-row"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${escape(name)}${me ? ' <span class="sys">(나)</span>' : ""}</div>`;
+        const me = u.id && u.id === myId;
+        const label = me ? `<b>${escape(name)}</b>` : escape(name);
+        return `<div class="user-row${me ? " me" : ""}"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${label}${me ? ' <span class="me-tag">나</span>' : ""}</div>`;
       }).join("");
     }
 
