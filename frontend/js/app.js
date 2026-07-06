@@ -58,8 +58,18 @@
     sendChat(text) { if (this.socket) this.socket.emit("chat:message", text); },
     pushChat(msg) { this.chat.push(msg); if (this.chat.length > 200) this.chat.shift(); this.emit(); },
     sendRoomChat(text) { if (this.socket) this.socket.emit("room:chat", text); },
-    createRoom(payload) { return new Promise((res) => this.socket.emit("room:create", payload, res)); },
-    joinRoom(payload) { return new Promise((res) => this.socket.emit("room:join", payload, res)); },
+    createRoom(payload) {
+      return new Promise((res) => this.socket.emit("room:create", payload, (r) => {
+        if (r && r.ok && r.room) { this.room = r.room; this.roomChat = []; this.emit(); }
+        res(r);
+      }));
+    },
+    joinRoom(payload) {
+      return new Promise((res) => this.socket.emit("room:join", payload, (r) => {
+        if (r && r.ok && r.room) { this.room = r.room; this.roomChat = []; this.emit(); }
+        res(r);
+      }));
+    },
     leaveRoom() {
       this.roomChat = []; this.room = null;
       this.emit();
