@@ -314,11 +314,11 @@
     const scroll = el.querySelector("#chat-scroll");
     const input = el.querySelector("#chat-input");
     function paint() {
-      scroll.innerHTML = net.chat.map((m) =>
-        m.sys
-          ? `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`
-          : `<div class="chat-line"><span class="u">${escape(m.user)}</span>${escape(m.text)}</div>`
-      ).join("");
+      scroll.innerHTML = net.chat.map((m) => {
+        if (m.sys) return `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`;
+        const me = m.user === DISPLAY_NAME;
+        return `<div class="chat-line${me ? " me" : ""}"><span class="u">${escape(m.user)}${me ? " (나)" : ""}</span>${escape(m.text)}</div>`;
+      }).join("");
       scroll.scrollTop = scroll.scrollHeight;
     }
     function submit() {
@@ -353,13 +353,10 @@
         return;
       }
       const myId = net.socket && net.socket.id;
-      // 나를 항상 맨 위로 고정
-      const ordered = [...users].sort((a, b) => (b.id === myId) - (a.id === myId));
-      scroll.innerHTML = ordered.map((u) => {
+      scroll.innerHTML = users.map((u) => {
         const name = u.name || "손님";
         const me = u.id && u.id === myId;
-        const label = me ? `<b>${escape(name)}</b>` : escape(name);
-        return `<div class="user-row${me ? " me" : ""}"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${label}${me ? ' <span class="me-tag">나</span>' : ""}</div>`;
+        return `<div class="user-row"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
       }).join("");
     }
 
@@ -398,7 +395,7 @@
           </button>
         </div>
       </div>`);
-    return [content, sidebarChat()];
+    return [content, null];
   }
 
   function soloView() {
