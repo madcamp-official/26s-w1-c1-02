@@ -1,4 +1,4 @@
-/* 미니게임천국 MVP — SPA shell, views, websocket lobby chat.
+/* 미니게임천국 MVP — SPA shell, views, Socket.IO 로비 채팅 + 멀티플레이 방.
    Login/profile intentionally deferred: a random guest identity is used. */
 (function () {
   const app = document.getElementById("app");
@@ -11,7 +11,7 @@
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
   // ---- app state ----
-  const state = { view: "login", online: 1, gameCleanup: null };
+  const state = { view: "login", online: 1, gameCleanup: null, contentCleanup: null };
 
   // ---- solo games catalog (다른 그림 찾기 is the featured playable mode) ----
   const SOLO_GAMES = [
@@ -27,47 +27,60 @@
       desc: "다양한 주제의 상식 문제로 두뇌를 깨워보세요.", lv: 5, done: 4, total: 18 },
   ];
 
-  // ---- mock multiplayer rooms (real-time wiring comes later) ----
-  const ROOMS = [
-    { n: 1, name: "초보자 환영! 같이해요", host: "하늘별", mode: "다른그림찾기", cur: 3, max: 6, state: "wait", locked: false },
-    { n: 2, name: "고수만 오세요 ㄴㅇㄱ", host: "퀵마스터", mode: "스피드타자", cur: 5, max: 6, state: "play", locked: false },
-    { n: 3, name: "비밀방이에요", host: "??", mode: "끝말잇기", cur: 2, max: 4, state: "wait", locked: true },
-    { n: 4, name: "상식 배틀 한판", host: "박학다식", mode: "상식퀴즈", cur: 1, max: 8, state: "wait", locked: false },
-    { n: 5, name: "즐겜해요~~ 누구든 환영", host: "달빛토끼", mode: "다른그림찾기", cur: 4, max: 6, state: "wait", locked: false },
-    { n: 6, name: "스피드 모드 도전", host: "번개", mode: "스피드타자", cur: 6, max: 6, state: "play", locked: false },
-  ];
-
   const USERS = ["하늘별", "퀵마스터", "달빛토끼", "English99", "번개", "소나기", "그림자", "별빛달", "초록숲", "무지개"];
 
-  // ---- lobby chat (backed by /ws when reachable) ----
-  const chat = {
-    messages: [{ sys: true, text: "미니게임천국 로비에 오신 것을 환영합니다 🎉" }],
-    ws: null, connected: false, listeners: new Set(),
+  function modeLabel(id) {
+    const m = net.modes.find((x) => x.id === id);
+    return m ? m.label : id;
+  }
+
+  // ---- realtime: 로비 채팅 + 멀티플레이 방 (Socket.IO) ----
+  const net = {
+    socket: null, connected: false, listeners: new Set(),
+    modes: [], rooms: [], room: null,
+    chat: [{ sys: true, text: "미니게임천국 로비에 오신 것을 환영합니다 🎉" }],
+    roomChat: [],
     connect() {
-      if (this.ws) return;
-      try {
-        const proto = location.protocol === "https:" ? "wss" : "ws";
-        const ws = new WebSocket(`${proto}://${location.host}/ws`);
-        this.ws = ws;
-        ws.onopen = () => { this.connected = true; this.emit(); };
-        ws.onclose = () => { this.connected = false; this.ws = null; this.emit(); };
-        ws.onerror = () => { this.connected = false; };
-        ws.onmessage = (ev) => {
-          let msg; try { msg = JSON.parse(ev.data); } catch { msg = { user: "?", text: String(ev.data) }; }
-          if (msg && msg.user === DISPLAY_NAME) return; // our own echo already shown
-          this.push(msg);
-        };
-      } catch { this.connected = false; }
+      if (this.socket || typeof io === "undefined") return;
+      const socket = io({ path: "/socket.io" });
+      this.socket = socket;
+      socket.on("connect", () => { this.connected = true; socket.emit("identify", DISPLAY_NAME); this.emit(); });
+      socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
+      socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
+      socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
+      socket.on("room:state", (room) => { this.room = room; this.emit(); });
+      socket.on("chat:history", (msgs) => { this.chat.push(...msgs); this.emit(); });
+      socket.on("chat:message", (msg) => { this.pushChat(msg); });
+      socket.on("room:chat", (msg) => { this.roomChat.push(msg); if (this.roomChat.length > 200) this.roomChat.shift(); this.emit(); });
+      socket.on("room:notice", (text) => toast(text));
     },
-    send(text) {
-      const msg = { user: DISPLAY_NAME, text, ts: Date.now() };
-      this.push(msg);
-      if (this.connected && this.ws) { try { this.ws.send(JSON.stringify(msg)); } catch {} }
+    identify(name) { if (this.socket) this.socket.emit("identify", name); },
+    sendChat(text) { if (this.socket) this.socket.emit("chat:message", text); },
+    pushChat(msg) { this.chat.push(msg); if (this.chat.length > 200) this.chat.shift(); this.emit(); },
+    sendRoomChat(text) { if (this.socket) this.socket.emit("room:chat", text); },
+    createRoom(payload) {
+      return new Promise((res) => this.socket.emit("room:create", payload, (r) => {
+        if (r && r.ok && r.room) { this.room = r.room; this.roomChat = []; this.emit(); }
+        res(r);
+      }));
     },
-    push(msg) { this.messages.push(msg); if (this.messages.length > 100) this.messages.shift(); this.emit(); },
+    joinRoom(payload) {
+      return new Promise((res) => this.socket.emit("room:join", payload, (r) => {
+        if (r && r.ok && r.room) { this.room = r.room; this.roomChat = []; this.emit(); }
+        res(r);
+      }));
+    },
+    leaveRoom() {
+      this.roomChat = []; this.room = null;
+      this.emit();
+      return new Promise((res) => this.socket.emit("room:leave", res));
+    },
+    setMode(mode) { if (this.socket) this.socket.emit("room:setMode", mode); },
+    toggleReady() { if (this.socket) this.socket.emit("room:ready"); },
+    toggleStart() { if (this.socket) this.socket.emit("room:start"); },
     emit() { this.listeners.forEach((fn) => fn()); },
   };
-  chat.connect();
+  net.connect();
 
   // ---------- audio (WebAudio, asset-free) ----------
   const audio = {
@@ -203,6 +216,7 @@
       localStorage.removeItem("mgh.nickname");
       GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
       DISPLAY_NAME = GUEST_ID;
+      net.identify(DISPLAY_NAME);
       close();
       go("login");
     });
@@ -250,6 +264,7 @@
         localStorage.setItem("mgh.username", GUEST_ID);
         DISPLAY_NAME = data.user.nickname || GUEST_ID;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+        net.identify(DISPLAY_NAME);
         close();
         go("lobby");
       } catch {
@@ -278,7 +293,7 @@
         </div>
         <div class="nav-spacer"></div>
         <div class="nav-right">
-          <div class="nav-online"><span class="dot-live"></span>${chat.connected ? "실시간 연결됨" : "오프라인 모드"}</div>
+          <div class="nav-online"><span class="dot-live"></span>${net.connected ? "실시간 연결됨" : "오프라인 모드"}</div>
           <button class="nav-icon">🔔</button>
           <button class="nav-icon" id="nav-gear" title="설정">⚙️</button>
           <div class="nav-guest"><div class="av">🙂</div><div class="who">${DISPLAY_NAME}</div></div>
@@ -300,7 +315,7 @@
     const scroll = el.querySelector("#chat-scroll");
     const input = el.querySelector("#chat-input");
     function paint() {
-      scroll.innerHTML = chat.messages.map((m) =>
+      scroll.innerHTML = net.chat.map((m) =>
         m.sys
           ? `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`
           : `<div class="chat-line"><span class="u">${escape(m.user)}</span>${escape(m.text)}</div>`
@@ -310,14 +325,14 @@
     function submit() {
       const v = input.value.trim();
       if (!v) return;
-      chat.send(v); input.value = "";
+      net.sendChat(v); input.value = "";
     }
     el.querySelector("#chat-send").addEventListener("click", submit);
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
 
     const listener = () => paint();
-    chat.listeners.add(listener);
-    el._cleanup = () => chat.listeners.delete(listener);
+    net.listeners.add(listener);
+    el._cleanup = () => net.listeners.delete(listener);
     paint();
     return el;
   }
@@ -432,41 +447,352 @@
     return [content, null];
   }
 
-  function multiView() {
-    const rows = ROOMS.map((r) => `
-      <tr>
-        <td>${r.n}</td>
-        <td><div class="room-name">${r.locked ? "🔒 " : ""}${escape(r.name)}</div></td>
-        <td class="host">☆ ${escape(r.host)}</td>
-        <td>${escape(r.mode)}</td>
-        <td>${r.cur}/${r.max}</td>
-        <td><span class="state ${r.state === "wait" ? "wait" : "play"}">${r.state === "wait" ? "대기중" : "게임중"}</span></td>
-      </tr>`).join("");
+  // ---- 방 생성 모달 ----
+  function openCreateRoom() {
+    if (document.getElementById("room-create-overlay")) return;
+    if (!net.connected) { toast("서버에 연결되어 있지 않습니다."); return; }
+    const modes = net.modes.length ? net.modes : [{ id: "spot", label: "다른그림찾기" }];
 
+    const o = h(`
+      <div class="overlay" id="room-create-overlay">
+        <form class="room-modal" id="room-create-form">
+          <div class="room-modal-head"><h2>방 만들기</h2><button type="button" class="settings-close" title="닫기">✕</button></div>
+          <div class="rm-field">
+            <label for="rc-name">방 이름</label>
+            <input class="rm-input" id="rc-name" placeholder="방 이름을 입력하세요" maxlength="40" />
+          </div>
+          <div class="rm-field">
+            <label for="rc-mode">게임 모드</label>
+            <select class="rm-input" id="rc-mode">
+              ${modes.map((m) => `<option value="${m.id}">${escape(m.label)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="rm-field">
+            <div class="rm-slider-label">최대 인원: <span id="rc-max-val">6</span>명</div>
+            <input type="range" min="2" max="8" step="1" value="6" id="rc-max" />
+            <div class="rm-slider-ends"><span>2명</span><span>8명</span></div>
+          </div>
+          <div class="rm-toggle-row">
+            <span>비밀방</span>
+            <button type="button" class="rm-switch" id="rc-private" role="switch" aria-checked="false"></button>
+          </div>
+          <input class="rm-input" id="rc-password" type="password" placeholder="비밀번호" style="display:none" />
+          <div class="rm-actions">
+            <button type="button" class="rm-btn ghost" id="rc-cancel">취소</button>
+            <button type="submit" class="rm-btn primary">방 생성</button>
+          </div>
+        </form>
+      </div>`);
+
+    const close = () => o.remove();
+    o.addEventListener("click", (e) => { if (e.target === o) close(); });
+    o.querySelector(".settings-close").addEventListener("click", close);
+    o.querySelector("#rc-cancel").addEventListener("click", close);
+
+    const maxSlider = o.querySelector("#rc-max"), maxVal = o.querySelector("#rc-max-val");
+    maxSlider.addEventListener("input", () => { maxVal.textContent = maxSlider.value; });
+
+    let isPrivate = false;
+    const privSwitch = o.querySelector("#rc-private");
+    const pwInput = o.querySelector("#rc-password");
+    privSwitch.addEventListener("click", () => {
+      isPrivate = !isPrivate;
+      privSwitch.classList.toggle("on", isPrivate);
+      privSwitch.setAttribute("aria-checked", isPrivate ? "true" : "false");
+      pwInput.style.display = isPrivate ? "" : "none";
+      if (isPrivate) pwInput.focus();
+    });
+
+    o.querySelector("#room-create-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = o.querySelector("#rc-name").value.trim();
+      if (!name) { toast("방 이름을 입력해주세요."); return; }
+      const password = pwInput.value;
+      if (isPrivate && !password) { toast("비밀방은 비밀번호를 입력해주세요."); return; }
+      const res = await net.createRoom({
+        name, mode: o.querySelector("#rc-mode").value, maxPlayers: +maxSlider.value,
+        private: isPrivate, password,
+      });
+      if (!res.ok) { toast(res.message || "방 생성에 실패했습니다."); return; }
+      close();
+      go("room");
+    });
+
+    document.body.appendChild(o);
+    o.querySelector("#rc-name").focus();
+  }
+
+  // ---- 방 코드로 참가 모달 ----
+  function openJoinByCode() {
+    if (document.getElementById("room-join-overlay")) return;
+    if (!net.connected) { toast("서버에 연결되어 있지 않습니다."); return; }
+    const o = h(`
+      <div class="overlay" id="room-join-overlay">
+        <form class="room-modal" id="room-join-form">
+          <div class="room-modal-head"><h2>방 참가</h2><button type="button" class="settings-close" title="닫기">✕</button></div>
+          <div class="rm-field">
+            <label for="rj-code">방 코드</label>
+            <input class="rm-input rm-upper" id="rj-code" placeholder="방 코드를 입력하세요" maxlength="12" autocapitalize="characters" />
+          </div>
+          <div class="rm-field">
+            <label for="rj-password">비밀번호</label>
+            <input class="rm-input" id="rj-password" type="password" placeholder="비밀방인 경우 입력" />
+          </div>
+          <div class="rm-actions">
+            <button type="button" class="rm-btn ghost" id="rj-cancel">취소</button>
+            <button type="submit" class="rm-btn primary">참가하기</button>
+          </div>
+        </form>
+      </div>`);
+
+    const close = () => o.remove();
+    o.addEventListener("click", (e) => { if (e.target === o) close(); });
+    o.querySelector(".settings-close").addEventListener("click", close);
+    o.querySelector("#rj-cancel").addEventListener("click", close);
+
+    // 방 코드 입력 시 자동으로 대문자 변환
+    const codeInput = o.querySelector("#rj-code");
+    codeInput.addEventListener("input", () => {
+      const start = codeInput.selectionStart;
+      codeInput.value = codeInput.value.toUpperCase();
+      codeInput.setSelectionRange(start, start);
+    });
+
+    o.querySelector("#room-join-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const roomId = o.querySelector("#rj-code").value.trim().toUpperCase();
+      if (!roomId) { toast("방 코드를 입력해주세요."); return; }
+      const password = o.querySelector("#rj-password").value;
+      const res = await net.joinRoom({ roomId, password });
+      if (!res.ok) { toast(res.message || "참가에 실패했습니다."); return; }
+      close();
+      go("room");
+    });
+
+    document.body.appendChild(o);
+    o.querySelector("#rj-code").focus();
+  }
+
+  // ---- 비밀방 참가 시 비밀번호 입력 모달 ----
+  function openRoomPassword(room) {
+    if (document.getElementById("room-pw-overlay")) return;
+    const o = h(`
+      <div class="overlay" id="room-pw-overlay">
+        <form class="room-modal" id="room-pw-form">
+          <div class="room-modal-head"><h2>🔒 ${escape(room.name)}</h2><button type="button" class="settings-close" title="닫기">✕</button></div>
+          <div class="rm-field">
+            <label for="rp-password">비밀번호</label>
+            <input class="rm-input" id="rp-password" type="password" placeholder="비밀번호를 입력하세요" />
+          </div>
+          <div class="rm-actions">
+            <button type="button" class="rm-btn ghost" id="rp-cancel">취소</button>
+            <button type="submit" class="rm-btn primary">입장하기</button>
+          </div>
+        </form>
+      </div>`);
+
+    const close = () => o.remove();
+    o.addEventListener("click", (e) => { if (e.target === o) close(); });
+    o.querySelector(".settings-close").addEventListener("click", close);
+    o.querySelector("#rp-cancel").addEventListener("click", close);
+
+    o.querySelector("#room-pw-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const password = o.querySelector("#rp-password").value;
+      const res = await net.joinRoom({ roomId: room.id, password });
+      if (!res.ok) { toast(res.message || "참가에 실패했습니다."); return; }
+      close();
+      go("room");
+    });
+
+    document.body.appendChild(o);
+    o.querySelector("#rp-password").focus();
+  }
+
+  function multiView() {
     const content = h(`
       <div class="content">
         <div class="page-head">
           <button class="page-back" data-nav="lobby">←</button>
           <div class="page-title">멀티플레이 로비</div>
-          <div class="page-sub">방 ${ROOMS.length}개</div>
+          <div class="page-sub" id="mp-count">방 ${net.rooms.length}개</div>
         </div>
         <div class="mp-toolbar">
-          <div class="mp-search"><input placeholder="방 검색..." /></div>
+          <div class="mp-search"><input placeholder="방 검색 (준비 중)..." disabled /></div>
           <button class="btn primary" id="mk-room">＋ 방 생성</button>
           <button class="btn" id="join-room">→ 방 참가</button>
         </div>
         <div class="rooms">
           <table>
             <thead><tr><th>#</th><th>방 이름</th><th>방장</th><th>모드</th><th>인원</th><th>상태</th></tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody></tbody>
           </table>
         </div>
       </div>`);
 
-    content.querySelector("#mk-room").addEventListener("click", () => toast("방 생성은 실시간 서버 연동 후 제공됩니다."));
-    content.querySelector("#join-room").addEventListener("click", () => toast("방 참가는 실시간 서버 연동 후 제공됩니다."));
-    content.querySelectorAll("tbody tr").forEach((tr) => tr.addEventListener("click", () => toast("방 입장은 실시간 서버 연동 후 제공됩니다.")));
+    const tbody = content.querySelector("tbody");
+    const count = content.querySelector("#mp-count");
+
+    function paint() {
+      count.textContent = `방 ${net.rooms.length}개`;
+      tbody.innerHTML = net.rooms.length
+        ? net.rooms.map((r, i) => `
+          <tr data-room="${r.id}">
+            <td>${i + 1}</td>
+            <td><div class="room-name">${r.locked ? "🔒 " : ""}${escape(r.name)}</div></td>
+            <td class="host">☆ ${escape(r.hostName)}</td>
+            <td>${escape(modeLabel(r.mode))}</td>
+            <td>${r.cur}/${r.max}</td>
+            <td><span class="state ${r.state === "wait" ? "wait" : "play"}">${r.state === "wait" ? "대기중" : "게임중"}</span></td>
+          </tr>`).join("")
+        : `<tr><td colspan="6" class="rooms-empty">아직 생성된 방이 없어요. 방을 만들어보세요!</td></tr>`;
+
+      tbody.querySelectorAll("tr[data-room]").forEach((tr) => tr.addEventListener("click", async () => {
+        const room = net.rooms.find((r) => r.id === tr.dataset.room);
+        if (!room) return;
+        if (room.cur >= room.max) { toast("방 인원이 가득 찼습니다."); return; }
+        if (room.locked) { openRoomPassword(room); return; }
+        const res = await net.joinRoom({ roomId: room.id });
+        if (!res.ok) { toast(res.message || "참가에 실패했습니다."); return; }
+        go("room");
+      }));
+    }
+
+    content.querySelector("#mk-room").addEventListener("click", openCreateRoom);
+    content.querySelector("#join-room").addEventListener("click", openJoinByCode);
+
+    const listener = () => paint();
+    net.listeners.add(listener);
+    content._cleanup = () => net.listeners.delete(listener);
+    paint();
     return [content, sidebarUsers()];
+  }
+
+  function sidebarRoomChat() {
+    const el = h(`
+      <aside class="sidebar">
+        <div class="side-head"><div class="t">💬 방 채팅</div><div class="c" id="room-chat-count">0명</div></div>
+        <div class="side-scroll" id="room-chat-scroll"></div>
+        <div class="side-input">
+          <input id="room-chat-input" placeholder="메시지 입력..." maxlength="120" />
+          <button id="room-chat-send">➤</button>
+        </div>
+      </aside>`);
+
+    const scroll = el.querySelector("#room-chat-scroll");
+    const count = el.querySelector("#room-chat-count");
+    const input = el.querySelector("#room-chat-input");
+    function paint() {
+      count.textContent = `${net.room ? net.room.players.length : 0}명`;
+      scroll.innerHTML = net.roomChat.map((m) =>
+        m.sys
+          ? `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`
+          : `<div class="chat-line"><span class="u">${escape(m.user)}</span>${escape(m.text)}</div>`
+      ).join("");
+      scroll.scrollTop = scroll.scrollHeight;
+    }
+    function submit() {
+      const v = input.value.trim();
+      if (!v) return;
+      net.sendRoomChat(v); input.value = "";
+    }
+    el.querySelector("#room-chat-send").addEventListener("click", submit);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+
+    const listener = () => paint();
+    net.listeners.add(listener);
+    el._cleanup = () => net.listeners.delete(listener);
+    paint();
+    return el;
+  }
+
+  function roomView() {
+    const content = h(`<div class="content"><div id="room-root"></div></div>`);
+    const root = content.querySelector("#room-root");
+    let gearOpen = false;
+
+    function leaveAndGoLobby() {
+      net.leaveRoom().then(() => go("multi"));
+    }
+
+    // 기어 메뉴: 바깥 클릭 시 닫기
+    function onDocClick(e) {
+      if (!gearOpen || e.target.closest(".room-gear-wrap")) return;
+      gearOpen = false;
+      const menu = root.querySelector("#room-gear-menu");
+      if (menu) menu.hidden = true;
+    }
+    document.addEventListener("click", onDocClick);
+
+    function paint() {
+      const room = net.room;
+      if (!room) { go("multi"); return; }
+      const isHost = !!(net.socket && room.hostId === net.socket.id);
+      const meId = net.socket && net.socket.id;
+      const modeOptions = (net.modes.length ? net.modes : [{ id: room.mode, label: modeLabel(room.mode) }])
+        .map((m) => `<option value="${m.id}"${m.id === room.mode ? " selected" : ""}>${escape(m.label)}</option>`).join("");
+
+      // 참가자 자리 + 빈 자리(점선 플레이스홀더). 방장=방장, 그 외=준비/대기(본인은 클릭 토글)
+      const slots = room.players.map((p) => {
+        const host = p.id === room.hostId;
+        const me = p.id === meId;
+        let badge;
+        if (host) badge = `<span class="slot-badge host">방장</span>`;
+        else if (me) badge = `<button class="slot-badge ready-btn ${p.ready ? "on" : "off"}" data-ready="1">${p.ready ? "준비완료" : "준비하기"}</button>`;
+        else badge = `<span class="slot-badge ${p.ready ? "on" : "off"}">${p.ready ? "준비" : "대기중"}</span>`;
+        return `
+          <div class="slot filled${me ? " me-slot" : ""}">
+            <div class="av" style="background:${avColor(p.name)}">${escape(p.name[0] || "?")}</div>
+            <span class="slot-name">${escape(p.name)}</span>
+            ${badge}
+          </div>`;
+      }).join("");
+      const emptyCount = Math.max(0, room.maxPlayers - room.players.length);
+      const emptySlots = Array.from({ length: emptyCount }, () => `<div class="slot empty"></div>`).join("");
+
+      root.innerHTML = `
+        <div class="page-head room-head">
+          <button class="page-back" id="room-back">←</button>
+          <div class="page-title">${escape(room.name)}</div>
+          <div class="room-head-actions">
+            ${isHost ? `<button class="btn primary" id="room-toggle">${room.state === "wait" ? "게임 시작" : "대기실로"}</button>` : ""}
+            ${isHost ? `
+            <div class="room-gear-wrap">
+              <button class="nav-icon" id="room-gear" title="게임 모드 설정">⚙️</button>
+              <div class="room-gear-menu" id="room-gear-menu"${gearOpen ? "" : " hidden"}>
+                <div class="rgm-label">게임 모드</div>
+                <select class="rm-input" id="room-mode">${modeOptions}</select>
+              </div>
+            </div>` : ""}
+          </div>
+        </div>
+        <div class="room-info-line">
+          ${isHost ? "" : `<span class="room-mode-tag">${escape(modeLabel(room.mode))}</span>`}
+          <span class="state ${room.state === "wait" ? "wait" : "play"}">${room.state === "wait" ? "대기중" : "게임중"}</span>
+          <span class="room-info-meta">코드 ${escape(String(room.id).toUpperCase())}${room.locked ? " · 🔒" : ""} · ${room.players.length}/${room.maxPlayers}</span>
+        </div>
+        <div class="room-slots">${slots}${emptySlots}</div>`;
+
+      root.querySelector("#room-back").addEventListener("click", leaveAndGoLobby);
+      const modeSel = root.querySelector("#room-mode");
+      if (modeSel) modeSel.addEventListener("change", () => net.setMode(modeSel.value));
+      const toggleBtn = root.querySelector("#room-toggle");
+      if (toggleBtn) toggleBtn.addEventListener("click", () => net.toggleStart());
+      const gearBtn = root.querySelector("#room-gear");
+      if (gearBtn) gearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        gearOpen = !gearOpen;
+        root.querySelector("#room-gear-menu").hidden = !gearOpen;
+      });
+      const readyBtn = root.querySelector("[data-ready]");
+      if (readyBtn) readyBtn.addEventListener("click", () => net.toggleReady());
+    }
+
+    const listener = () => paint();
+    net.listeners.add(listener);
+    content._cleanup = () => { net.listeners.delete(listener); document.removeEventListener("click", onDocClick); };
+    paint();
+    return [content, sidebarRoomChat()];
   }
 
   // ---- social brand icons (inline SVG, no external assets) ----
@@ -524,6 +850,7 @@
         localStorage.setItem("mgh.username", GUEST_ID);
         DISPLAY_NAME = data.user.nickname || GUEST_ID;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+        net.identify(DISPLAY_NAME);
         go("lobby");
       } catch {
         toast("서버에 연결할 수 없습니다.");
@@ -541,6 +868,7 @@
   let mountedSidebar = null;
   function render() {
     if (state.gameCleanup) { state.gameCleanup(); state.gameCleanup = null; }
+    if (state.contentCleanup) { state.contentCleanup(); state.contentCleanup = null; }
     if (mountedSidebar && mountedSidebar._cleanup) mountedSidebar._cleanup();
     mountedSidebar = null;
 
@@ -551,13 +879,18 @@
       return;
     }
 
+    // 방에 참여 중이 아닌데 방 화면으로 온 경우 (새로고침 등) 로비로 되돌림
+    if (state.view === "room" && !net.room) { state.view = "multi"; }
+
     let content, sidebar;
     if (state.view === "lobby") [content, sidebar] = lobbyView();
     else if (state.view === "solo") [content, sidebar] = soloView();
     else if (state.view === "game:spot") [content, sidebar] = spotGameView();
     else if (state.view === "game:vowel") [content, sidebar] = vowelGameView();
     else if (state.view === "multi") [content, sidebar] = multiView();
+    else if (state.view === "room") [content, sidebar] = roomView();
 
+    state.contentCleanup = content && content._cleanup ? content._cleanup : null;
     mountedSidebar = sidebar;
 
     const shell = h(`<div class="app-shell"></div>`);
@@ -578,10 +911,10 @@
 
   function go(view) { state.view = view; location.hash = view; render(); }
 
-  // update nav "connected" label when ws state changes
-  chat.listeners.add(() => {
+  // update nav "connected" label when realtime state changes
+  net.listeners.add(() => {
     const label = document.querySelector(".nav-online");
-    if (label) label.innerHTML = `<span class="dot-live"></span>${chat.connected ? "실시간 연결됨" : "오프라인 모드"}`;
+    if (label) label.innerHTML = `<span class="dot-live"></span>${net.connected ? "실시간 연결됨" : "오프라인 모드"}`;
   });
 
   // ---------- helpers ----------

@@ -1,21 +1,22 @@
-// 임시 부하 테스트: N개의 동시 웹소켓 연결 + 주기적 메시지 브로드캐스트
-const WebSocket = require('ws');
+// 임시 부하 테스트: N개의 동시 socket.io 연결 + 주기적 로비 채팅 브로드캐스트
+const { io } = require('socket.io-client');
 const N = parseInt(process.argv[2] || '50', 10);
-const URL = 'ws://localhost:8080/ws';
+const URL = process.argv[3] || 'http://localhost:8080';
 let open = 0, recv = 0;
 const clients = [];
 
 for (let i = 0; i < N; i++) {
-  const ws = new WebSocket(URL);
-  ws.on('open', () => {
+  const socket = io(URL, { path: '/socket.io' });
+  socket.on('connect', () => {
     open++;
+    socket.emit('identify', 'load' + i);
     setInterval(() => {
-      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ user: 'load' + i, text: 'msg ' + Date.now() }));
+      if (socket.connected) socket.emit('chat:message', 'msg ' + Date.now());
     }, 1000);
   });
-  ws.on('message', () => { recv++; });
-  ws.on('error', () => {});
-  clients.push(ws);
+  socket.on('chat:message', () => { recv++; });
+  socket.on('connect_error', () => {});
+  clients.push(socket);
 }
 
 setTimeout(() => {

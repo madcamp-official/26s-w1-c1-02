@@ -1,8 +1,8 @@
 require("dotenv").config();
 const http = require("http");
 const express = require("express");
-const { WebSocketServer } = require("ws");
 const { migrate } = require("./db");
+const { attachRealtime } = require("./realtime/rooms");
 const signupRouter = require("./routes/signup");
 const loginRouter = require("./routes/login");
 const jamoApi = require("./vowel_game/api");
@@ -23,15 +23,8 @@ app.use("/api/games/jamo", jamoApi);
 
 const server = http.createServer(app);
 
-// 실시간 채팅/멀티 (기존 브로드캐스트 유지)
-const wss = new WebSocketServer({ server, path: "/ws" });
-wss.on("connection", (ws) => {
-  ws.on("message", (data) => {
-    for (const client of wss.clients) {
-      if (client.readyState === client.OPEN) client.send(data.toString());
-    }
-  });
-});
+// 실시간 채팅 + 멀티플레이 방(생성/참가/비밀방/방장 모드변경) — Socket.IO
+attachRealtime(server);
 
 async function start() {
   // PostgreSQL — 계정 + 게임 스키마 준비
