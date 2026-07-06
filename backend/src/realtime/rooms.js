@@ -51,7 +51,7 @@ function attachRealtime(server) {
     maxPlayers: room.maxPlayers,
     state: room.state,
     hostId: room.hostId,
-    players: room.players.map((p) => ({ id: p.id, name: p.name })),
+    players: room.players.map((p) => ({ id: p.id, name: p.name, ready: !!p.ready })),
   });
 
   const broadcastRoomList = () => io.emit("rooms:update", Array.from(rooms.values()).map(publicRoom));
@@ -125,7 +125,7 @@ function attachRealtime(server) {
         state: "wait",
         hostId: socket.id,
         hostName: socket.data.name,
-        players: [{ id: socket.id, name: socket.data.name }],
+        players: [{ id: socket.id, name: socket.data.name, ready: true }],
       };
       rooms.set(room.id, room);
       socket.join(room.id);
@@ -146,7 +146,7 @@ function attachRealtime(server) {
 
       leaveRoom(socket);
 
-      room.players.push({ id: socket.id, name: socket.data.name });
+      room.players.push({ id: socket.id, name: socket.data.name, ready: false });
       socket.join(room.id);
       socket.data.roomId = room.id;
 
@@ -171,10 +171,28 @@ function attachRealtime(server) {
       broadcastRoomList();
     });
 
+    socket.on("room:ready", () => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || room.hostId === socket.id) return; // 방장은 준비 토글 없음
+      const me = room.players.find((p) => p.id === socket.id);
+      if (!me) return;
+      me.ready = !me.ready;
+      broadcastRoomState(room);
+    });
+
     socket.on("room:start", () => {
       const room = rooms.get(socket.data.roomId);
       if (!room || room.hostId !== socket.id) return;
-      room.state = room.state === "wait" ? "play" : "wait";
+      if (room.state === "wait") {
+        const allReady = room.players.every((p) => p.id === room.hostId || p.ready);
+        if (!allReady) {
+          socket.emit("room:notice", "아직 준비하지 않은 참가자가 있습니다.");
+          return;
+        }
+        room.state = "play";
+      } else {
+        room.state = "wait";
+      }
       roomSystemMessage(room, room.state === "play" ? "게임이 시작되었습니다." : "대기실로 돌아왔습니다.");
       broadcastRoomState(room);
       broadcastRoomList();

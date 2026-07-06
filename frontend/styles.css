@@ -218,6 +218,14 @@ select.rm-input { appearance: none; cursor: pointer; }
 /* ---------- 방(대기실) 화면 ---------- */
 .room-head-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .room-head-actions .btn { padding: 8px 16px; }
+.room-gear-wrap { position: relative; }
+.room-gear-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 200px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.room-gear-menu[hidden] { display: none; }
+.rgm-label { font-size: 12px; font-weight: 700; color: var(--muted); }
 .room-info-line {
   display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
   margin: 0 2px 18px; font-size: 14px; color: var(--ink-soft);
@@ -225,11 +233,6 @@ select.rm-input { appearance: none; cursor: pointer; }
 .room-info-name { font-weight: 800; color: var(--ink); }
 .room-info-meta { font-size: 12px; color: var(--muted); }
 .room-mode-tag { font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
-.room-mode-inline {
-  padding: 6px 10px; border-radius: 9px; border: 1px solid var(--border);
-  background: var(--card); color: var(--ink); font-size: 13px; font-weight: 700;
-  appearance: none; cursor: pointer;
-}
 .room-slots { display: flex; flex-direction: column; gap: 12px; max-width: 640px; }
 .slot {
   display: flex; align-items: center; gap: 12px; padding: 13px 18px; min-height: 60px;
@@ -238,10 +241,15 @@ select.rm-input { appearance: none; cursor: pointer; }
 .slot.me-slot { border-color: var(--accent); }
 .slot .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; color: #fff; font-weight: 700; flex: none; }
 .slot-name { flex: 1; font-size: 15px; font-weight: 700; }
-.slot-badge { font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: var(--card-strong); color: var(--ink-soft); }
-.slot-badge.host { background: var(--accent-soft); color: var(--accent); }
-.slot-badge.me { background: var(--accent-soft); color: var(--accent); }
+.slot-badge { font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; background: var(--card-strong); color: var(--ink-soft); }
+.slot-badge.host { background: var(--card-strong); color: var(--ink-soft); }
+.slot-badge.on { background: #e3ecd8; color: #5a7040; }        /* 준비 완료 = 초록 */
+.slot-badge.off { background: #f7dcd2; color: #b8543c; }       /* 대기중 = 빨강 */
+.slot-badge.ready-btn { border: 0; cursor: pointer; }
+.slot-badge.ready-btn:hover { filter: brightness(.97); }
 .slot.empty { background: transparent; border-style: dashed; }
+:root[data-theme="dark"] .slot-badge.on { background: #2e3a26; color: #a7c48a; }
+:root[data-theme="dark"] .slot-badge.off { background: #3d2a24; color: #d99b86; }
 
 /* ---------- Sidebar (chat / users) ---------- */
 .side-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }

@@ -52,6 +52,7 @@
       socket.on("chat:history", (msgs) => { this.chat.push(...msgs); this.emit(); });
       socket.on("chat:message", (msg) => { this.pushChat(msg); });
       socket.on("room:chat", (msg) => { this.roomChat.push(msg); if (this.roomChat.length > 200) this.roomChat.shift(); this.emit(); });
+      socket.on("room:notice", (text) => toast(text));
     },
     identify(name) { if (this.socket) this.socket.emit("identify", name); },
     sendChat(text) { if (this.socket) this.socket.emit("chat:message", text); },
@@ -65,6 +66,7 @@
       return new Promise((res) => this.socket.emit("room:leave", res));
     },
     setMode(mode) { if (this.socket) this.socket.emit("room:setMode", mode); },
+    toggleReady() { if (this.socket) this.socket.emit("room:ready"); },
     toggleStart() { if (this.socket) this.socket.emit("room:start"); },
     emit() { this.listeners.forEach((fn) => fn()); },
   };
@@ -689,10 +691,20 @@
   function roomView() {
     const content = h(`<div class="content"><div id="room-root"></div></div>`);
     const root = content.querySelector("#room-root");
+    let gearOpen = false;
 
     function leaveAndGoLobby() {
       net.leaveRoom().then(() => go("multi"));
     }
+
+    // 기어 메뉴: 바깥 클릭 시 닫기
+    function onDocClick(e) {
+      if (!gearOpen || e.target.closest(".room-gear-wrap")) return;
+      gearOpen = false;
+      const menu = root.querySelector("#room-gear-menu");
+      if (menu) menu.hidden = true;
+    }
+    document.addEventListener("click", onDocClick);
 
     function paint() {
       const room = net.room;
@@ -702,13 +714,14 @@
       const modeOptions = (net.modes.length ? net.modes : [{ id: room.mode, label: modeLabel(room.mode) }])
         .map((m) => `<option value="${m.id}"${m.id === room.mode ? " selected" : ""}>${escape(m.label)}</option>`).join("");
 
-      // 채워진 자리 + 빈 자리(점선 플레이스홀더)
+      // 참가자 자리 + 빈 자리(점선 플레이스홀더). 방장=방장, 그 외=준비/대기(본인은 클릭 토글)
       const slots = room.players.map((p) => {
         const host = p.id === room.hostId;
         const me = p.id === meId;
-        const badge = host
-          ? `<span class="slot-badge host">방장</span>`
-          : `<span class="slot-badge${me ? " me" : ""}">${me ? "나" : "대기중"}</span>`;
+        let badge;
+        if (host) badge = `<span class="slot-badge host">방장</span>`;
+        else if (me) badge = `<button class="slot-badge ready-btn ${p.ready ? "on" : "off"}" data-ready="1">${p.ready ? "준비완료" : "준비하기"}</button>`;
+        else badge = `<span class="slot-badge ${p.ready ? "on" : "off"}">${p.ready ? "준비" : "대기중"}</span>`;
         return `
           <div class="slot filled${me ? " me-slot" : ""}">
             <div class="av" style="background:${avColor(p.name)}">${escape(p.name[0] || "?")}</div>
@@ -722,33 +735,45 @@
       root.innerHTML = `
         <div class="page-head room-head">
           <button class="page-back" id="room-back">←</button>
-          <div class="page-title">멀티플레이 로비</div>
+          <div class="page-title">${escape(room.name)}</div>
           <div class="room-head-actions">
             ${isHost ? `<button class="btn primary" id="room-toggle">${room.state === "wait" ? "게임 시작" : "대기실로"}</button>` : ""}
-            <button class="btn" id="room-leave">방 나가기</button>
+            ${isHost ? `
+            <div class="room-gear-wrap">
+              <button class="nav-icon" id="room-gear" title="게임 모드 설정">⚙️</button>
+              <div class="room-gear-menu" id="room-gear-menu"${gearOpen ? "" : " hidden"}>
+                <div class="rgm-label">게임 모드</div>
+                <select class="rm-input" id="room-mode">${modeOptions}</select>
+              </div>
+            </div>` : ""}
           </div>
         </div>
         <div class="room-info-line">
           <span class="room-info-name"># 방 이름 : ${escape(room.name)}</span>
-          ${isHost
-            ? `<select class="room-mode-inline" id="room-mode">${modeOptions}</select>`
-            : `<span class="room-mode-tag">${escape(modeLabel(room.mode))}</span>`}
+          ${isHost ? "" : `<span class="room-mode-tag">${escape(modeLabel(room.mode))}</span>`}
           <span class="state ${room.state === "wait" ? "wait" : "play"}">${room.state === "wait" ? "대기중" : "게임중"}</span>
           <span class="room-info-meta">코드 ${escape(room.id)}${room.locked ? " · 🔒" : ""} · ${room.players.length}/${room.maxPlayers}</span>
         </div>
         <div class="room-slots">${slots}${emptySlots}</div>`;
 
       root.querySelector("#room-back").addEventListener("click", leaveAndGoLobby);
-      root.querySelector("#room-leave").addEventListener("click", leaveAndGoLobby);
       const modeSel = root.querySelector("#room-mode");
       if (modeSel) modeSel.addEventListener("change", () => net.setMode(modeSel.value));
       const toggleBtn = root.querySelector("#room-toggle");
       if (toggleBtn) toggleBtn.addEventListener("click", () => net.toggleStart());
+      const gearBtn = root.querySelector("#room-gear");
+      if (gearBtn) gearBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        gearOpen = !gearOpen;
+        root.querySelector("#room-gear-menu").hidden = !gearOpen;
+      });
+      const readyBtn = root.querySelector("[data-ready]");
+      if (readyBtn) readyBtn.addEventListener("click", () => net.toggleReady());
     }
 
     const listener = () => paint();
     net.listeners.add(listener);
-    content._cleanup = () => net.listeners.delete(listener);
+    content._cleanup = () => { net.listeners.delete(listener); document.removeEventListener("click", onDocClick); };
     paint();
     return [content, sidebarRoomChat()];
   }
