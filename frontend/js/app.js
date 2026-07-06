@@ -27,8 +27,6 @@
       desc: "다양한 주제의 상식 문제로 두뇌를 깨워보세요.", lv: 5, done: 4, total: 18 },
   ];
 
-  const USERS = ["하늘별", "퀵마스터", "달빛토끼", "English99", "번개", "소나기", "그림자", "별빛달", "초록숲", "무지개"];
-
   function modeLabel(id) {
     const m = net.modes.find((x) => x.id === id);
     return m ? m.label : id;
@@ -37,7 +35,7 @@
   // ---- realtime: 로비 채팅 + 멀티플레이 방 (Socket.IO) ----
   const net = {
     socket: null, connected: false, listeners: new Set(),
-    modes: [], rooms: [], room: null,
+    modes: [], rooms: [], room: null, presence: [],
     chat: [{ sys: true, text: "미니게임천국 로비에 오신 것을 환영합니다 🎉" }],
     roomChat: [],
     connect() {
@@ -48,6 +46,7 @@
       socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
       socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
       socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
+      socket.on("presence", (users) => { this.presence = users; this.emit(); });
       socket.on("room:state", (room) => { this.room = room; this.emit(); });
       socket.on("chat:history", (msgs) => { this.chat.push(...msgs); this.emit(); });
       socket.on("chat:message", (msg) => { this.pushChat(msg); });
@@ -338,14 +337,33 @@
   }
 
   function sidebarUsers() {
-    const rows = USERS.map((u) =>
-      `<div class="user-row"><div class="av" style="background:${avColor(u)}">${u[0]}</div>${escape(u)}</div>`
-    ).join("");
-    return h(`
+    const el = h(`
       <aside class="sidebar">
-        <div class="side-head"><div class="t">👥 접속자</div><div class="c">${state.online + USERS.length}명</div></div>
-        <div class="side-scroll">${rows}<div class="chat-line"><span class="sys">+ 다른 접속자들</span></div></div>
+        <div class="side-head"><div class="t">👥 접속자</div><div class="c" id="users-count">0명</div></div>
+        <div class="side-scroll" id="users-scroll"></div>
       </aside>`);
+
+    const scroll = el.querySelector("#users-scroll");
+    const count = el.querySelector("#users-count");
+    function paint() {
+      const users = net.presence;
+      count.textContent = `${users.length}명`;
+      if (!users.length) {
+        scroll.innerHTML = `<div class="chat-line"><span class="sys">${net.connected ? "접속 중인 플레이어가 없습니다" : "오프라인 모드"}</span></div>`;
+        return;
+      }
+      scroll.innerHTML = users.map((u) => {
+        const name = u.name || "손님";
+        const me = u.id && net.socket && u.id === net.socket.id;
+        return `<div class="user-row"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${escape(name)}${me ? ' <span class="sys">(나)</span>' : ""}</div>`;
+      }).join("");
+    }
+
+    const listener = () => paint();
+    net.listeners.add(listener);
+    el._cleanup = () => net.listeners.delete(listener);
+    paint();
+    return el;
   }
 
   function lobbyView() {

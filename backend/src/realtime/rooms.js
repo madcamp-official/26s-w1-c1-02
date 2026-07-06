@@ -3,9 +3,7 @@ const { Server } = require("socket.io");
 
 const MODES = [
   { id: "spot", label: "다른그림찾기" },
-  { id: "speed", label: "스피드타자" },
-  { id: "word", label: "끝말잇기" },
-  { id: "quiz", label: "상식퀴즈" },
+  { id: "vowel", label: "자음 모음 조합하기" },
 ];
 const MODE_IDS = new Set(MODES.map((m) => m.id));
 const DEFAULT_MODE = MODES[0].id;
@@ -58,6 +56,13 @@ function attachRealtime(server) {
     players: room.players.map((p) => ({ id: p.id, name: p.name, ready: !!p.ready })),
   });
 
+  // 서버에 실시간 접속 중인 전체 플레이어 목록 (방 참여 여부 무관)
+  const broadcastPresence = () => {
+    const users = [];
+    for (const s of io.of("/").sockets.values()) users.push({ id: s.id, name: s.data.name });
+    io.emit("presence", users);
+  };
+
   const broadcastRoomList = () => io.emit("rooms:update", Array.from(rooms.values()).map(publicRoom));
   const broadcastRoomState = (room) => io.to(room.id).emit("room:state", roomState(room));
   const roomSystemMessage = (room, text) => io.to(room.id).emit("room:chat", { sys: true, text, ts: Date.now() });
@@ -93,9 +98,11 @@ function attachRealtime(server) {
     socket.emit("modes", MODES);
     socket.emit("chat:history", chatHistory.slice(-50));
     socket.emit("rooms:update", Array.from(rooms.values()).map(publicRoom));
+    broadcastPresence();
 
     socket.on("identify", (name) => {
       socket.data.name = sanitize(name, NAME_MAX_LEN) || socket.data.name;
+      broadcastPresence();
     });
 
     socket.on("chat:message", (text) => {
@@ -211,7 +218,7 @@ function attachRealtime(server) {
       io.to(room.id).emit("room:chat", { user: socket.data.name, text: clean, ts: Date.now() });
     });
 
-    socket.on("disconnect", () => leaveRoom(socket));
+    socket.on("disconnect", () => { leaveRoom(socket); broadcastPresence(); });
   });
 
   return io;
