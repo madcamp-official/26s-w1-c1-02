@@ -3,8 +3,8 @@
 (function () {
   const app = document.getElementById("app");
 
-  // ---- guest identity (replaced with real nickname after login) ----
-  let GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
+  // ---- 프로필 정체성: 로그인 시 계정 아이디(username)로 교체, 로그인 전엔 손님 ----
+  let GUEST_ID = localStorage.getItem("mgh.user") || ("손님" + Math.floor(1000 + Math.random() * 9000));
   const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
@@ -194,8 +194,14 @@
       o.querySelectorAll("[data-theme-opt]").forEach((x) => x.classList.toggle("active", x === b));
     }));
 
-    // 로그아웃 (백엔드 세션 붙기 전까지는 로그인 화면으로 복귀)
-    o.querySelector("#btn-logout")?.addEventListener("click", () => { close(); go("login"); });
+    // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
+    o.querySelector("#btn-logout")?.addEventListener("click", () => {
+      localStorage.removeItem("mgh.token");
+      localStorage.removeItem("mgh.user");
+      GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
+      close();
+      go("login");
+    });
 
     document.body.appendChild(o);
   }
@@ -236,7 +242,8 @@
         const data = await res.json();
         if (!res.ok) { toast(data.message || "회원가입에 실패했습니다."); return; }
         localStorage.setItem("mgh.token", data.token);
-        GUEST_ID = data.user.nickname || data.user.username;
+        GUEST_ID = data.user.username;
+        localStorage.setItem("mgh.user", GUEST_ID);
         close();
         go("lobby");
       } catch {
@@ -507,7 +514,8 @@
         const data = await res.json();
         if (!res.ok) { toast(data.message || "로그인에 실패했습니다."); return; }
         localStorage.setItem("mgh.token", data.token);
-        GUEST_ID = data.user.nickname || data.user.username;
+        GUEST_ID = data.user.username;
+        localStorage.setItem("mgh.user", GUEST_ID);
         go("lobby");
       } catch {
         toast("서버에 연결할 수 없습니다.");
