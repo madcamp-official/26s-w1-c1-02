@@ -4,7 +4,9 @@
   const app = document.getElementById("app");
 
   // ---- 프로필 정체성: 로그인 시 계정 아이디(username)로 교체, 로그인 전엔 손님 ----
-  let GUEST_ID = localStorage.getItem("mgh.user") || ("손님" + Math.floor(1000 + Math.random() * 9000));
+  let GUEST_ID = localStorage.getItem("mgh.username") || ("손님" + Math.floor(1000 + Math.random() * 9000));
+  // ---- 화면에 표시할 이름: 로그인 시 닉네임, 로그인 전엔 손님 아이디 ----
+  let DISPLAY_NAME = localStorage.getItem("mgh.nickname") || GUEST_ID;
   const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
@@ -52,13 +54,13 @@
         ws.onerror = () => { this.connected = false; };
         ws.onmessage = (ev) => {
           let msg; try { msg = JSON.parse(ev.data); } catch { msg = { user: "?", text: String(ev.data) }; }
-          if (msg && msg.user === GUEST_ID) return; // our own echo already shown
+          if (msg && msg.user === DISPLAY_NAME) return; // our own echo already shown
           this.push(msg);
         };
       } catch { this.connected = false; }
     },
     send(text) {
-      const msg = { user: GUEST_ID, text, ts: Date.now() };
+      const msg = { user: DISPLAY_NAME, text, ts: Date.now() };
       this.push(msg);
       if (this.connected && this.ws) { try { this.ws.send(JSON.stringify(msg)); } catch {} }
     },
@@ -197,8 +199,10 @@
     // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
     o.querySelector("#btn-logout")?.addEventListener("click", () => {
       localStorage.removeItem("mgh.token");
-      localStorage.removeItem("mgh.user");
+      localStorage.removeItem("mgh.username");
+      localStorage.removeItem("mgh.nickname");
       GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
+      DISPLAY_NAME = GUEST_ID;
       close();
       go("login");
     });
@@ -243,7 +247,9 @@
         if (!res.ok) { toast(data.message || "회원가입에 실패했습니다."); return; }
         localStorage.setItem("mgh.token", data.token);
         GUEST_ID = data.user.username;
-        localStorage.setItem("mgh.user", GUEST_ID);
+        localStorage.setItem("mgh.username", GUEST_ID);
+        DISPLAY_NAME = data.user.nickname || GUEST_ID;
+        localStorage.setItem("mgh.nickname", DISPLAY_NAME);
         close();
         go("lobby");
       } catch {
@@ -275,7 +281,7 @@
           <div class="nav-online"><span class="dot-live"></span>${chat.connected ? "실시간 연결됨" : "오프라인 모드"}</div>
           <button class="nav-icon">🔔</button>
           <button class="nav-icon" id="nav-gear" title="설정">⚙️</button>
-          <div class="nav-guest"><div class="av">🙂</div><div class="who">${GUEST_ID}</div></div>
+          <div class="nav-guest"><div class="av">🙂</div><div class="who">${DISPLAY_NAME}</div></div>
         </div>
       </div>`;
   }
@@ -332,7 +338,7 @@
       <div class="content">
         <div class="banner">
           <h1>미니게임천국에 오신 것을 환영합니다!</h1>
-          <p>${GUEST_ID}님, 오늘도 즐거운 게임 되세요 🎮</p>
+          <p>${DISPLAY_NAME}님, 오늘도 즐거운 게임 되세요 🎮</p>
           <div class="stats">
             <div class="stat"><div class="n">0</div><div class="l">총 승리</div></div>
             <div class="stat"><div class="n">–</div><div class="l">승률</div></div>
@@ -515,7 +521,9 @@
         if (!res.ok) { toast(data.message || "로그인에 실패했습니다."); return; }
         localStorage.setItem("mgh.token", data.token);
         GUEST_ID = data.user.username;
-        localStorage.setItem("mgh.user", GUEST_ID);
+        localStorage.setItem("mgh.username", GUEST_ID);
+        DISPLAY_NAME = data.user.nickname || GUEST_ID;
+        localStorage.setItem("mgh.nickname", DISPLAY_NAME);
         go("lobby");
       } catch {
         toast("서버에 연결할 수 없습니다.");
