@@ -30,8 +30,6 @@
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, s) % 60).padStart(2, "0")}`;
   const medal = (i) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`);
-  // 점수 산출 내역(등수/난이도/속도 보너스) 툴팁·표시용 텍스트
-  const breakdownText = (b) => b ? `기본 ${b.base} · 순위 +${b.rankBonus} · 난이도 +${b.difficultyBonus} · 속도 +${b.speedBonus}` : "";
 
   window.VowelMulti = {
     mount(container, opts = {}) {
@@ -169,8 +167,7 @@
           mySolved = true;
           const input = $("#vm-input"); if (input) { input.disabled = true; input.classList.remove("bad"); }
           const btn = $("#vm-submit"); if (btn) btn.disabled = true;
-          setResult(`<span class="ok-msg">✓ 정답! ${data.rank}등 · +${data.points}점</span>
-            <div class="vm-breakdown">${escape(breakdownText(data.breakdown))}</div>`);
+          setResult(`<span class="ok-msg">✓ 정답!</span>`);
         } else {
           const msg = data.reason === "JAMO_MISMATCH" ? "제시된 자모를 정확히 다 써야 해요."
             : data.reason === "NOT_IN_DICTIONARY" ? "사전에 없는 단어예요."
@@ -188,7 +185,7 @@
         const answers = (data.answers || []).slice(0, 8).map((w) => `<span class="vm-ans">${escape(w)}</span>`).join("");
         const rs = (data.roundScores || []);
         const rsHtml = rs.length
-          ? rs.map((r) => `<div class="vm-rs-row" title="${escape(breakdownText(r.breakdown))}"><span>${r.rank}등 ${escape(r.name)}</span><span>+${r.points}</span></div>`).join("")
+          ? rs.map((r) => `<div class="vm-rs-row"><span>${r.rank}등 ${escape(r.name)}</span><span>+${r.points}</span></div>`).join("")
           : `<div class="vm-rs-row"><span class="sys">아무도 못 맞혔어요</span></div>`;
 
         const el = $("#vm-reveal");
