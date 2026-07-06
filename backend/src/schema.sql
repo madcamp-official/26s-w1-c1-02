@@ -1,6 +1,18 @@
 -- 공유 코어 스키마 (게임 무관, 모든 기능 공용) — idempotent
 -- 게임별 전용 테이블은 각 모듈의 schema.sql 참고 (예: src/vowel_game/schema.sql)
 
+-- 계정 (로그인/회원가입). 기존 MongoDB → Postgres 로 통합.
+CREATE TABLE IF NOT EXISTS users (
+  id            BIGSERIAL PRIMARY KEY,
+  username      TEXT     NOT NULL,          -- 로그인 아이디
+  email         TEXT     NOT NULL,
+  password_hash TEXT     NOT NULL,          -- bcrypt 해시
+  nickname      TEXT     NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (username)
+);
+
 -- 플레이 기록 (모든 게임 공용). puzzle_id 는 게임별 문제 식별자(FK 없음: 게임 독립성 유지)
 CREATE TABLE IF NOT EXISTS game_results (
   id             BIGSERIAL PRIMARY KEY,

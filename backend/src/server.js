@@ -2,7 +2,7 @@ require("dotenv").config();
 const http = require("http");
 const express = require("express");
 const { WebSocketServer } = require("ws");
-const { connectDB, migrate } = require("./db");
+const { migrate } = require("./db");
 const signupRouter = require("./routes/signup");
 const loginRouter = require("./routes/login");
 const jamoApi = require("./vowel_game/api");
@@ -14,7 +14,7 @@ app.use(express.json());
 
 app.get("/health", (req, res) => res.type("text").send("ok"));
 
-// 로그인/회원가입 API (MongoDB)
+// 로그인/회원가입 API (PostgreSQL)
 app.use("/api", signupRouter);
 app.use("/api", loginRouter);
 
@@ -34,10 +34,7 @@ wss.on("connection", (ws) => {
 });
 
 async function start() {
-  // MongoDB (계정) — 실패해도 게임 기능은 계속 동작하도록 비치명적 처리
-  connectDB().catch((err) => console.error("MongoDB 연결 실패:", err.message));
-
-  // PostgreSQL (게임) — 스키마 준비
+  // PostgreSQL — 계정 + 게임 스키마 준비
   try {
     await migrate();
     console.log("db schema ready");
