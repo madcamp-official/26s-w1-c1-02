@@ -397,11 +397,13 @@ select.rm-input { appearance: none; cursor: pointer; }
 /* 넓은 화면: 레일을 뷰포트 왼쪽 끝에 고정 — 오른쪽 끝의 채팅과 대칭. 가운데 정렬된 .main 폭과 무관하게
    항상 화면 왼쪽 끝에 붙는다(현재 문제·게임 화면 등 메인 레이아웃과 독립). */
 @media (min-width: 1240px) {
-  .content.room-playing { margin-left: 272px; }
+  /* 채팅이 오른쪽 316px를 차지하므로 왼쪽도 동일하게 316px 확보 → 콘텐츠(두 이미지)의 중앙이 페이지 중앙에 온다. */
+  .content.room-playing { margin-left: 316px; }
+  /* 레일은 폭을 고정하지 않고 내용(글자/참가자 수)에 맞춰 크기가 잡히도록 shrink-to-fit. */
   .content.room-playing .vm-rail {
     position: fixed; left: 16px; top: calc(var(--nav-h) + 18px);
-    width: 240px; height: calc(100dvh - var(--nav-h) - 36px); overflow-y: auto;
-    flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0; z-index: 5;
+    max-width: 260px; max-height: calc(100dvh - var(--nav-h) - 36px); overflow-y: auto;
+    flex-direction: column; flex-wrap: nowrap; align-items: flex-start; margin-bottom: 0; z-index: 5;
   }
 }
 /* 채팅이 숨는 폭(<=900)에서는 콘텐츠 오른쪽 여백도 되돌려 화면 전체를 쓴다. */

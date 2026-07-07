@@ -96,7 +96,7 @@
         const header = `
           <div class="vm-score-h-row">
             <span class="vm-rank"></span>
-            <span class="vm-name">참가자</span>
+            <span class="vm-name"></span>
             <span class="vm-pts">점수</span>
           </div>`;
         box.innerHTML = header + scores.map((s, i) => {
