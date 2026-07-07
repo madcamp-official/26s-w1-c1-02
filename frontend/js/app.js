@@ -7,6 +7,8 @@
   let GUEST_ID = localStorage.getItem("mgh.username") || ("손님" + Math.floor(1000 + Math.random() * 9000));
   // ---- 화면에 표시할 이름: 로그인 시 닉네임, 로그인 전엔 손님 아이디 ----
   let DISPLAY_NAME = localStorage.getItem("mgh.nickname") || GUEST_ID;
+  // 소셜 로그인 직후 닉네임 확정 전까지는 소켓에 identify(실명일 수 있는 값)를 보내지 않는다
+  let awaitingNicknameConfirm = (location.hash || "").replace("#", "") === "nickname-setup";
   const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
@@ -17,6 +19,7 @@
     localStorage.removeItem("mgh.nickname");
     GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
     DISPLAY_NAME = GUEST_ID;
+    awaitingNicknameConfirm = false;
     net.identify(DISPLAY_NAME);
     go("login");
   }
@@ -55,7 +58,7 @@
       if (this.socket || typeof io === "undefined") return;
       const socket = io({ path: "/socket.io" });
       this.socket = socket;
-      socket.on("connect", () => { this.connected = true; socket.emit("identify", DISPLAY_NAME); this.emit(); });
+      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", DISPLAY_NAME); this.emit(); });
       socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
       socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
       socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
@@ -1014,11 +1017,11 @@
         </header>
         <main class="login-main">
           <form class="login-card" id="nickname-form">
-            <div class="login-or"><span>다른 유저에게 보여질 닉네임을 확인해주세요</span></div>
-            <input class="login-input" id="nickname-input" placeholder="닉네임" maxlength="20" value="${escape(DISPLAY_NAME)}" />
+            <div class="login-or"><span>다른 유저에게 보여질 닉네임을 입력해주세요</span></div>
+            <input class="login-input" id="nickname-input" placeholder="닉네임" maxlength="20" autocomplete="off" />
             <div class="login-div"></div>
             <div class="login-actions">
-              <button type="submit" class="login-btn primary">이 닉네임으로 시작하기</button>
+              <button type="submit" class="login-btn primary">닉네임 설정하기</button>
               <button type="button" class="login-btn" id="nickname-cancel">다른 계정으로 로그인</button>
             </div>
           </form>
@@ -1045,6 +1048,7 @@
         }
         DISPLAY_NAME = data.nickname;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+        awaitingNicknameConfirm = false;
         net.identify(DISPLAY_NAME);
         go("lobby");
       } catch {
