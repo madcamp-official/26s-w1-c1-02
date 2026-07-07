@@ -404,17 +404,29 @@
   }
 
   // 로그인 상태면 레벨제 솔로 게임들의 실제 레벨/진행도를 가져와 SOLO_GAMES에 반영.
-  // apiPath/maxLevel은 각 게임 클라이언트(vowel-game.js/spot-difference.js)의 값과 동일해야 함.
+  // apiPath/maxLevel/lsKey는 각 게임 클라이언트(vowel-game.js/spot-difference.js)의 값과 동일해야 함.
   const PROGRESS_GAMES = [
-    { id: "vowel", apiPath: "jamo", maxLevel: 20 },
-    { id: "spot", apiPath: "spot", maxLevel: 20 },
+    { id: "vowel", apiPath: "jamo", maxLevel: 20, lsKey: "mgh.vowel.cleared" },
+    { id: "spot", apiPath: "spot", maxLevel: 20, lsKey: "mgh.spot.cleared" },
   ];
   async function refreshSoloProgress() {
     const token = localStorage.getItem("mgh.token");
     if (!token) return;
     let changed = false;
-    await Promise.all(PROGRESS_GAMES.map(async ({ id, apiPath, maxLevel }) => {
+    await Promise.all(PROGRESS_GAMES.map(async ({ id, apiPath, maxLevel, lsKey }) => {
       try {
+        // 이 브라우저에 이미 기록된 로컬 클리어 레벨을 서버에도 반영.
+        // 각 게임 화면(vowel-game.js/spot-difference.js)의 레벨 선택 화면을 열어야만
+        // 서버로 올라가므로, 로그인 후 홈 화면만 본 경우엔 아직 반영 안 됐을 수 있음.
+        const local = Math.min(maxLevel, Math.max(0, parseInt(localStorage.getItem(lsKey), 10) || 0));
+        if (local > 0) {
+          await fetch(`/api/games/${apiPath}/level-clear`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ level: local }),
+          }).catch(() => {});
+        }
+
         const res = await fetch(`/api/games/${apiPath}/progress`, {
           headers: { Authorization: `Bearer ${token}` },
         });
