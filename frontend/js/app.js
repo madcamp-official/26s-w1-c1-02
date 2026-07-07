@@ -1001,6 +1001,52 @@
     return shell;
   }
 
+  // 소셜 로그인 직후 닉네임 확인/설정 (구글/네이버는 실명이 그대로 넘어올 수 있어 확인 절차 필요)
+  function nicknameSetupView() {
+    const shell = h(`
+      <div class="app-shell login-shell">
+        <header class="login-top">
+          <div class="nav-brand">
+            <div class="nav-logo">미</div>
+            <div class="nav-title">미니게임천국</div>
+          </div>
+        </header>
+        <main class="login-main">
+          <form class="login-card" id="nickname-form">
+            <div class="login-or"><span>다른 유저에게 보여질 닉네임을 확인해주세요</span></div>
+            <input class="login-input" id="nickname-input" placeholder="닉네임" maxlength="20" value="${escape(DISPLAY_NAME)}" />
+            <div class="login-div"></div>
+            <div class="login-actions">
+              <button type="submit" class="login-btn primary">이 닉네임으로 시작하기</button>
+            </div>
+          </form>
+        </main>
+      </div>`);
+
+    shell.querySelector("#nickname-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nickname = shell.querySelector("#nickname-input").value.trim();
+      if (!nickname) { toast("닉네임을 입력해주세요."); return; }
+      try {
+        const token = localStorage.getItem("mgh.token");
+        const res = await fetch("/api/profile/nickname", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ nickname }),
+        });
+        const data = await res.json();
+        if (!res.ok) { toast(data.message || "닉네임 설정에 실패했습니다."); return; }
+        DISPLAY_NAME = data.nickname;
+        localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+        net.identify(DISPLAY_NAME);
+        go("lobby");
+      } catch {
+        toast("서버에 연결할 수 없습니다.");
+      }
+    });
+    return shell;
+  }
+
   // ---------- router ----------
   let mountedSidebar = null;
   function render() {
@@ -1009,10 +1055,15 @@
     if (mountedSidebar && mountedSidebar._cleanup) mountedSidebar._cleanup();
     mountedSidebar = null;
 
-    // 로그인 화면은 독립 레이아웃 (표준 네비/사이드바 없음)
+    // 로그인 / 닉네임 설정 화면은 독립 레이아웃 (표준 네비/사이드바 없음)
     if (state.view === "login") {
       app.innerHTML = "";
       app.appendChild(loginView());
+      return;
+    }
+    if (state.view === "nickname-setup") {
+      app.innerHTML = "";
+      app.appendChild(nicknameSetupView());
       return;
     }
 
@@ -1083,8 +1134,8 @@
   }
 
   const initial = (location.hash || "").replace("#", "");
-  if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel"].includes(initial)) state.view = initial;
-  if (tokenFromUrl) state.view = "lobby";
+  if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel", "nickname-setup"].includes(initial)) state.view = initial;
+  if (tokenFromUrl) state.view = "nickname-setup";
   render();
 
   // BGM이 켜진 상태로 저장돼 있으면, 브라우저 자동재생 정책상 첫 클릭에서 재생 시작
