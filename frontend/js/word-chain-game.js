@@ -8,16 +8,18 @@
   const MAX_LEVEL = 20;
   const LIVES_START = 3;       // 목숨 — 레벨 무관 고정
   const BOSS_EVERY = 5;        // 보스 턴 주기(턴 카운트 5의 배수) — 레벨 무관 고정
-  const BOSS_MIN_LEN = 5;      // 보스 턴 최소 글자 수 — 레벨 무관 고정
+  const BOSS_MIN_LEN = 4;      // 보스 턴 최소 글자 수 (기본값, 고레벨은 levelConfig에서 +1)
   const LS_KEY = "mgh.wordchain.cleared";
   const isLoggedIn = () => !!localStorage.getItem("mgh.token");
   const getGuestCleared = () => Math.min(MAX_LEVEL, Math.max(0, parseInt(localStorage.getItem(LS_KEY), 10) || 0));
   const setGuestCleared = (n) => localStorage.setItem(LS_KEY, String(Math.min(MAX_LEVEL, n)));
 
   // 전체 게임 시간(초): 레벨 1~5=90초, 6~10=75초, 11~15=60초, 16~20=45초.
+  // 보스 턴 글자 수: 레벨 1~15=4글자, 16~20(고레벨)=5글자.
   function levelConfig(n) {
     const totalTime = Math.max(45, 90 - Math.floor((n - 1) / 5) * 15);
-    return { totalTime, bossEvery: BOSS_EVERY, bossMinLength: BOSS_MIN_LEN };
+    const bossMinLength = n > 15 ? BOSS_MIN_LEN + 1 : BOSS_MIN_LEN;
+    return { totalTime, bossEvery: BOSS_EVERY, bossMinLength };
   }
   const fmt = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, s) % 60).padStart(2, "0")}`;
 
