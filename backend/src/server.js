@@ -7,6 +7,7 @@ const signupRouter = require("./routes/signup");
 const loginRouter = require("./routes/login");
 const oauthRouter = require("./routes/oauth");
 const jamoApi = require("./vowel_game/api");
+const { cleanupExpiredPuzzles } = require("./vowel_game/puzzle");
 
 const PORT = process.env.PORT || 8080;
 
@@ -38,6 +39,11 @@ async function start() {
   } catch (e) {
     console.error("migrate failed (Postgres 연결 확인):", e.message);
   }
+
+  // 만료된 발급 문제 주기 삭제 (jamo_puzzles 무한 증식 방지)
+  const sweep = () => cleanupExpiredPuzzles().catch((e) => console.error("puzzle cleanup failed:", e.message));
+  sweep();
+  setInterval(sweep, 10 * 60 * 1000);
 
   server.listen(PORT, () => console.log(`server listening on ${PORT} (http api + ws)`));
 }

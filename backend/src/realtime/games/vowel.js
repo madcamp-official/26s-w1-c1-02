@@ -82,10 +82,7 @@ function createVowelGame(io, room, config) {
 
     const key = seed.jamo_key;
     const jamo = puzzle.shuffle(puzzle.decompose(seed.word));
-    const [solutionCount, topAnswers] = await Promise.all([
-      puzzle.countSolutions(key),
-      puzzle.getSolutions(key, 1),
-    ]);
+    const { count: solutionCount, top: topAnswer } = await puzzle.solutionStats(key);
     if (disposed) return;
 
     const timeLimit = timeLimitFor(seed.syllable_count);
@@ -96,7 +93,7 @@ function createVowelGame(io, room, config) {
       timeLimit,
       startedAt: Date.now(),
       solvers: [], // [{ id, name, rank, points }]
-      hintWord: topAnswers[0] || seed.word,
+      hintWord: topAnswer || seed.word,
       ended: false,
     };
 

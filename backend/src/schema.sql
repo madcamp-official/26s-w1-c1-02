@@ -1,7 +1,7 @@
 -- 공유 코어 스키마 (게임 무관, 모든 기능 공용) — idempotent
 -- 게임별 전용 테이블은 각 모듈의 schema.sql 참고 (예: src/vowel_game/schema.sql)
 
--- 계정 (로그인/회원가입). 기존 MongoDB → Postgres 로 통합.
+-- 계정 (로그인/회원가입)
 CREATE TABLE IF NOT EXISTS users (
   id            BIGSERIAL PRIMARY KEY,
   username      TEXT     NOT NULL,          -- 로그인 아이디

@@ -7,6 +7,13 @@ const { decompose, jamoKey } = require("./jamo");
 const KEY = process.env.STDICT_API_KEY || "";
 const ENDPOINT = "https://stdict.korean.go.kr/api/search.do";
 
+// 부정 캐시: "사전에 없음"으로 확인된 단어의 재조회 방지.
+// 긍정 결과는 words 테이블에 캐시되지만 부정 결과는 저장할 곳이 없어
+// 같은 오답을 낼 때마다 외부 API 를 다시 때리게 됨 → 메모리 캐시로 차단.
+const NEG_TTL_MS = 60 * 60 * 1000;
+const NEG_MAX = 5000;
+const negCache = new Map(); // word -> 만료 시각(ms)
+
 function syllableCount(word) {
   let n = 0; for (const ch of word) { const c = ch.codePointAt(0); if (c >= 0xac00 && c <= 0xd7a3) n++; } return n;
 }
@@ -14,6 +21,11 @@ function syllableCount(word) {
 // 표제어로 존재하는지 조회. 존재하면 words 에 캐시하고 true.
 async function lookupAndCache(word) {
   if (!KEY) return false;
+  const negUntil = negCache.get(word);
+  if (negUntil) {
+    if (negUntil > Date.now()) return false;
+    negCache.delete(word);
+  }
   const url = `${ENDPOINT}?key=${encodeURIComponent(KEY)}&type_search=search&req_type=json&q=${encodeURIComponent(word)}`;
   let found = false;
   try {
@@ -26,7 +38,7 @@ async function lookupAndCache(word) {
     const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
     found = total > 0 && items.some((it) => (it.word || "").replace(/[-^]/g, "") === word);
   } catch (e) {
-    return false; // 네트워크/rate-limit 실패 시 조용히 폴백 안함
+    return false; // 네트워크/rate-limit 실패 시 조용히 폴백 안함 (일시 장애일 수 있어 부정 캐시도 안함)
   }
   if (found) {
     await pool.query(
@@ -35,6 +47,9 @@ async function lookupAndCache(word) {
        ON CONFLICT (word) DO NOTHING`,
       [word, jamoKey(word), syllableCount(word), decompose(word).length]
     );
+  } else {
+    if (negCache.size >= NEG_MAX) negCache.delete(negCache.keys().next().value);
+    negCache.set(word, Date.now() + NEG_TTL_MS);
   }
   return found;
 }
