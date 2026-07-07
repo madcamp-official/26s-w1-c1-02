@@ -15,9 +15,10 @@ router.patch("/profile/nickname", async (req, res) => {
       "UPDATE users SET nickname = $1 WHERE id = $2 RETURNING nickname",
       [nickname, req.userId]
     );
+    if (!rows[0]) return res.status(401).json({ message: "계정을 찾을 수 없습니다. 다시 로그인해주세요." });
     res.json({ nickname: rows[0].nickname });
   } catch (e) {
-    console.error("profile/nickname error:", e);
+    console.error("profile/nickname error:", e.message);
     res.status(500).json({ message: "서버 오류로 닉네임을 저장하지 못했습니다." });
   }
 });

@@ -10,6 +10,17 @@
   const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
+  // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
+  function logout() {
+    localStorage.removeItem("mgh.token");
+    localStorage.removeItem("mgh.username");
+    localStorage.removeItem("mgh.nickname");
+    GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
+    DISPLAY_NAME = GUEST_ID;
+    net.identify(DISPLAY_NAME);
+    go("login");
+  }
+
   // ---- app state ----
   const state = { view: "login", online: 1, gameCleanup: null, contentCleanup: null };
 
@@ -211,17 +222,7 @@
       o.querySelectorAll("[data-theme-opt]").forEach((x) => x.classList.toggle("active", x === b));
     }));
 
-    // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
-    o.querySelector("#btn-logout")?.addEventListener("click", () => {
-      localStorage.removeItem("mgh.token");
-      localStorage.removeItem("mgh.username");
-      localStorage.removeItem("mgh.nickname");
-      GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
-      DISPLAY_NAME = GUEST_ID;
-      net.identify(DISPLAY_NAME);
-      close();
-      go("login");
-    });
+    o.querySelector("#btn-logout")?.addEventListener("click", () => { close(); logout(); });
 
     document.body.appendChild(o);
   }
@@ -1018,11 +1019,13 @@
             <div class="login-div"></div>
             <div class="login-actions">
               <button type="submit" class="login-btn primary">이 닉네임으로 시작하기</button>
+              <button type="button" class="login-btn" id="nickname-cancel">다른 계정으로 로그인</button>
             </div>
           </form>
         </main>
       </div>`);
 
+    shell.querySelector("#nickname-cancel").addEventListener("click", logout);
     shell.querySelector("#nickname-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const nickname = shell.querySelector("#nickname-input").value.trim();
@@ -1035,7 +1038,11 @@
           body: JSON.stringify({ nickname }),
         });
         const data = await res.json();
-        if (!res.ok) { toast(data.message || "닉네임 설정에 실패했습니다."); return; }
+        if (!res.ok) {
+          toast(data.message || "닉네임 설정에 실패했습니다.");
+          if (res.status === 401) logout();
+          return;
+        }
         DISPLAY_NAME = data.nickname;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
         net.identify(DISPLAY_NAME);
@@ -1135,7 +1142,6 @@
 
   const initial = (location.hash || "").replace("#", "");
   if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel", "nickname-setup"].includes(initial)) state.view = initial;
-  if (tokenFromUrl) state.view = "nickname-setup";
   render();
 
   // BGM이 켜진 상태로 저장돼 있으면, 브라우저 자동재생 정책상 첫 클릭에서 재생 시작
