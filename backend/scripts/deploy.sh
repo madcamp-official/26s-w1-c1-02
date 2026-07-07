@@ -14,7 +14,11 @@ NGINX_CONF_DST="/etc/nginx/sites-available/minigameheaven.conf"
 
 echo "▶ 프론트엔드 배포 → $WEB_ROOT"
 mkdir -p "$WEB_ROOT/js"
-cp "$FRONTEND/index.html"            "$WEB_ROOT/index.html"
+# index.html의 정적 스크립트는 Cloudflare/브라우저가 최대 4시간 캐시함(nginx max-age=14400).
+# 배포마다 자동으로 새 캐시 버스팅 값을 넣어야 캐시 무효화를 깜빡하는 사고가 재발하지 않음
+# (버전 문자열을 안 올려서 옛 vowel-game.js가 계속 서빙된 적 있었음).
+BUILD_ID="$(date +%s)"
+sed "s/__BUILD__/$BUILD_ID/g" "$FRONTEND/index.html" > "$WEB_ROOT/index.html"
 cp "$FRONTEND/styles.css"            "$WEB_ROOT/styles.css"
 cp "$FRONTEND/js/app.js"             "$WEB_ROOT/js/app.js"
 cp "$FRONTEND/js/spot-difference.js" "$WEB_ROOT/js/spot-difference.js"
@@ -28,6 +32,8 @@ ln -sf "$NGINX_CONF_DST" /etc/nginx/sites-enabled/minigameheaven.conf
 nginx -t && systemctl reload nginx
 
 echo "▶ 웹소켓 서버 (재)빌드 & 기동"
+# 백엔드는 파일 복사 없이 이미지 자체를 새로 빌드함 — Dockerfile이 backend/src를
+# 통째로 COPY하므로 --build가 최신 backend/src 변경사항을 항상 그대로 반영함.
 cd "$BACKEND"
 docker compose up -d --build
 
