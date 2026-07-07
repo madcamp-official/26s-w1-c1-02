@@ -41,6 +41,7 @@
   }
 
   const DIFF_LABEL = { 1: "쉬움", 2: "보통", 3: "어려움", 4: "세종대왕" };
+  const SPOT_DIFF_LABEL = { 1: "쉬움", 2: "보통", 3: "어려움", 4: "인간프린터" };
 
   // 실시간 게임 엔진을 마운트하는 모드 / 1대1 전용(정원 2) 모드
   const ENGINE_MODES = new Set(["vowel", "spot", "baseball"]);
@@ -57,10 +58,12 @@
         tagDiff: (d) => (String(d) === "2" ? "4자리" : "3자리"),
       };
     }
+    // 다른 그림 찾기는 최고 난이도 라벨만 자체 표현("인간프린터"), 자음·모음 조합은 "세종대왕" 유지
+    const label = mode === "spot" ? SPOT_DIFF_LABEL : DIFF_LABEL;
     return {
-      diffLabel: "난이도", diffOptions: [[1, "쉬움"], [2, "보통"], [3, "어려움"], [4, "세종대왕"]], diffDef: 2,
+      diffLabel: "난이도", diffOptions: [1, 2, 3, 4].map((v) => [v, label[v]]), diffDef: 2,
       hasRounds: true, roundsLabel: "문제 수", roundsUnit: "개", roundsMin: 3, roundsMax: 20, roundsDef: 8,
-      tagDiff: (d) => DIFF_LABEL[d] || "?",
+      tagDiff: (d) => label[d] || "?",
     };
   }
 
