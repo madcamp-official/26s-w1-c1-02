@@ -97,7 +97,6 @@
         const header = `
           <div class="vm-score-h-row">
             <span class="vm-rank"></span>
-            <span class="vm-status"></span>
             <span class="vm-name">참가자</span>
             <span class="vm-pts">점수</span>
           </div>`;
@@ -106,7 +105,6 @@
           return `
             <div class="vm-score-row ${solved ? "solved" : "pending"}">
               <span class="vm-rank">${medal(i)}</span>
-              <span class="vm-status" title="${solved ? "이번 문제 정답" : "아직 못 맞힘"}">${solved ? "✔" : "…"}</span>
               <span class="vm-name">${escape(s.name)}</span>
               <span class="vm-pts">${s.score}</span>
             </div>`;

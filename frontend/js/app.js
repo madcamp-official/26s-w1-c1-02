@@ -701,13 +701,13 @@
           <div class="page-sub" id="mp-count">방 ${net.rooms.length}개</div>
         </div>
         <div class="mp-toolbar">
-          <div class="mp-search"><input placeholder="방 검색 (준비 중)..." disabled /></div>
+          <div class="mp-search"><input id="room-search" placeholder="방 검색..." /></div>
           <button class="btn primary" id="mk-room">＋ 방 생성</button>
           <button class="btn" id="join-room">→ 방 참가</button>
         </div>
         <div class="rooms">
           <table>
-            <thead><tr><th>#</th><th>방 이름</th><th>방장</th><th>모드</th><th>인원</th><th>상태</th></tr></thead>
+            <thead><tr><th>방 이름</th><th>방장</th><th>모드</th><th>인원</th><th>상태</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -715,20 +715,23 @@
 
     const tbody = content.querySelector("tbody");
     const count = content.querySelector("#mp-count");
+    const search = content.querySelector("#room-search");
 
     function paint() {
-      count.textContent = `방 ${net.rooms.length}개`;
-      tbody.innerHTML = net.rooms.length
-        ? net.rooms.map((r, i) => `
+      const q = search.value.trim().toLowerCase();
+      const rooms = q ? net.rooms.filter((r) => r.name.toLowerCase().includes(q)) : net.rooms;
+
+      count.textContent = q ? `방 ${rooms.length}개 (전체 ${net.rooms.length}개)` : `방 ${net.rooms.length}개`;
+      tbody.innerHTML = rooms.length
+        ? rooms.map((r) => `
           <tr data-room="${r.id}">
-            <td>${i + 1}</td>
             <td><div class="room-name">${r.locked ? "🔒 " : ""}${escape(r.name)}</div></td>
             <td class="host">☆ ${escape(r.hostName)}</td>
             <td>${escape(modeLabel(r.mode))}</td>
             <td>${r.cur}/${r.max}</td>
             <td><span class="state ${r.state === "wait" ? "wait" : "play"}">${r.state === "wait" ? "대기중" : "게임중"}</span></td>
           </tr>`).join("")
-        : `<tr><td colspan="6" class="rooms-empty">아직 생성된 방이 없어요. 방을 만들어보세요!</td></tr>`;
+        : `<tr><td colspan="5" class="rooms-empty">${q ? "검색 결과가 없어요." : "아직 생성된 방이 없어요. 방을 만들어보세요!"}</td></tr>`;
 
       tbody.querySelectorAll("tr[data-room]").forEach((tr) => tr.addEventListener("click", async () => {
         const room = net.rooms.find((r) => r.id === tr.dataset.room);
@@ -743,6 +746,7 @@
 
     content.querySelector("#mk-room").addEventListener("click", openCreateRoom);
     content.querySelector("#join-room").addEventListener("click", openJoinByCode);
+    search.addEventListener("input", paint);
 
     const listener = () => paint();
     net.listeners.add(listener);
@@ -805,10 +809,12 @@
         onExit: exitGame,
         onFinish: () => { gameFinished = true; },
       });
+      root.closest(".main")?.classList.add("room-playing");
     }
     function unmountGame() {
       if (gameCleanup) { gameCleanup(); gameCleanup = null; }
       gameMounted = false; gameFinished = false;
+      root.closest(".main")?.classList.remove("room-playing");
     }
     function exitGame() { unmountGame(); paint(); }
 
