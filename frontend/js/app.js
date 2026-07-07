@@ -33,6 +33,8 @@
       desc: "흩어진 자음·모음을 모두 조합해 실제 단어를 만드세요.", lv: 1, done: 0, total: 20, playable: true },
     { id: "spot", icon: "🔍", title: "다른 그림 찾기", badge: null,
       desc: "두 그림에서 서로 다른 부분을 제한 시간 안에 찾아보세요.", lv: 1, done: 0, total: 20, playable: true },
+    { id: "word", icon: "🔤", title: "끝말잇기", badge: null,
+      desc: "제한 시간 안에 끝말잇기 체인을 이어가세요.", lv: 1, done: 0, total: 20, playable: true },
   ];
 
   function modeLabel(id) {
@@ -431,6 +433,7 @@
   const PROGRESS_GAMES = [
     { id: "vowel", apiPath: "jamo", maxLevel: 20 },
     { id: "spot", apiPath: "spot", maxLevel: 20 },
+    { id: "word", apiPath: "wordchain", maxLevel: 20 },
   ];
   async function refreshSoloProgress() {
     const token = localStorage.getItem("mgh.token");
@@ -523,6 +526,21 @@
       </div>`);
     const mount = content.querySelector("#game-mount");
     state.gameCleanup = window.VowelGame.mount(mount, { onExit: () => go("solo") });
+    return [content, null];
+  }
+
+  function wordGameView() {
+    const content = h(`
+      <div class="content">
+        <div class="page-head">
+          <button class="page-back" data-nav="solo">←</button>
+          <div class="page-title">끝말잇기</div>
+          <div class="page-sub">제한 시간 안에 끝말잇기 체인을 이어가세요</div>
+        </div>
+        <div id="game-mount"></div>
+      </div>`);
+    const mount = content.querySelector("#game-mount");
+    state.gameCleanup = window.WordChainGame.mount(mount, { onExit: () => go("solo") });
     return [content, null];
   }
 
@@ -1149,6 +1167,7 @@
     else if (state.view === "solo") [content, sidebar] = soloView();
     else if (state.view === "game:spot") [content, sidebar] = spotGameView();
     else if (state.view === "game:vowel") [content, sidebar] = vowelGameView();
+    else if (state.view === "game:word") [content, sidebar] = wordGameView();
     else if (state.view === "multi") [content, sidebar] = multiView();
     else if (state.view === "room") [content, sidebar] = roomView();
 
@@ -1208,7 +1227,7 @@
   }
 
   const initial = (location.hash || "").replace("#", "");
-  if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel", "nickname-setup"].includes(initial)) state.view = initial;
+  if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel", "game:word", "nickname-setup"].includes(initial)) state.view = initial;
   render();
 
   // BGM이 켜진 상태로 저장돼 있으면, 브라우저 자동재생 정책상 첫 클릭에서 재생 시작
