@@ -364,9 +364,11 @@ select.rm-input { appearance: none; cursor: pointer; }
 .vm-top { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
 .vm-solvedbar { font-size: 14px; color: var(--ink-soft); }
 .vm-solvedbar b { color: var(--accent); font-size: 18px; }
-.vm-main { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
-.vm-rail { display: flex; flex-direction: column; gap: 10px; align-self: start; position: sticky; top: calc(var(--nav-h) + 18px); }
+/* 기본(중간/좁은 화면): 게임 화면이 콘텐츠 폭 전체를 쓰고, 메타(레일)는 상단 가로줄로. */
+.vm-main { display: block; }
+.vm-rail { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
 .vm-rail .sd-pill { padding: 8px 14px; }
+.vm-rail .vm-score { flex-basis: 100%; }
 .vm-stage { min-width: 0; }
 .vm-hint { text-align: center; margin: 4px 0 14px; color: var(--ink-soft); font-size: 15px; letter-spacing: 2px; }
 .vm-hint b { color: var(--accent); }
@@ -392,10 +394,19 @@ select.rm-input { appearance: none; cursor: pointer; }
 .vm-final-row.win { background: var(--accent-soft); }
 .vm-final-row .vm-pts { font-size: 16px; }
 .room-start-hint { text-align: center; color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
-@media (max-width: 760px) {
-  .vm-main { grid-template-columns: 1fr; }
-  .vm-rail { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .vm-rail .vm-score { flex-basis: 100%; }
+/* 넓은 화면: 레일을 뷰포트 왼쪽 끝에 고정 — 오른쪽 끝의 채팅과 대칭. 가운데 정렬된 .main 폭과 무관하게
+   항상 화면 왼쪽 끝에 붙는다(현재 문제·게임 화면 등 메인 레이아웃과 독립). */
+@media (min-width: 1240px) {
+  .content.room-playing { margin-left: 272px; }
+  .content.room-playing .vm-rail {
+    position: fixed; left: 16px; top: calc(var(--nav-h) + 18px);
+    width: 240px; height: calc(100dvh - var(--nav-h) - 36px); overflow-y: auto;
+    flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin-bottom: 0; z-index: 5;
+  }
+}
+/* 채팅이 숨는 폭(<=900)에서는 콘텐츠 오른쪽 여백도 되돌려 화면 전체를 쓴다. */
+@media (max-width: 900px) {
+  .content.room-playing { margin-right: 0; }
 }
 
 /* ---------- Login screen ---------- */
