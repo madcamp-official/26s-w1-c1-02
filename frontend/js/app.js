@@ -19,12 +19,6 @@
       desc: "흩어진 자음·모음을 모두 조합해 실제 단어를 만드세요.", lv: 1, done: 0, total: 20, playable: true },
     { id: "spot", icon: "🔍", title: "다른 그림 찾기", badge: null,
       desc: "두 그림에서 서로 다른 부분을 제한 시간 안에 찾아보세요.", lv: 1, done: 0, total: 20, playable: true },
-    { id: "word", icon: "🔤", title: "끝말잇기 연습", badge: null,
-      desc: "AI와 함께 끝말잇기 연습. 난이도를 선택할 수 있어요.", lv: 7, done: 6, total: 15 },
-    { id: "speed", icon: "⚡", title: "스피드 타자", badge: null,
-      desc: "제한 시간 내에 얼마나 빠르게 단어를 입력할 수 있나요?", lv: 3, done: 2, total: 12 },
-    { id: "quiz", icon: "🧠", title: "상식 퀴즈", badge: null,
-      desc: "다양한 주제의 상식 문제로 두뇌를 깨워보세요.", lv: 5, done: 4, total: 18 },
   ];
 
   function modeLabel(id) {
