@@ -74,12 +74,32 @@
       }
 
       // ================= 레벨 플레이 =================
-      function startLevel(n) {
+      async function startLevel(n) {
         level = n; cfg = levelConfig(n);
-        remain = cfg.totalTime; ended = false; lives = LIVES_START;
-        chain = []; requiredChar = null; turnTimes = []; turnStartedAt = Date.now();
-        stop(); timer = setInterval(tick, 1000);
+        ended = false; lives = LIVES_START;
+        chain = []; requiredChar = null; turnTimes = [];
+        stop();
+        container.innerHTML = `<div class="vg-error">문제 준비 중…</div>`;
+        await seedStartWord(); // 서버가 시작 단어를 내려줌(항상 같은 쉬운 단어로 시작하는 것 방지)
+        if (ended) return; // 로딩 중 레벨 선택으로 나갔으면 중단
+        remain = cfg.totalTime; turnStartedAt = Date.now();
+        timer = setInterval(tick, 1000);
         renderPlay();
+      }
+
+      async function seedStartWord() {
+        try {
+          const r = await fetch("/api/games/wordchain/start");
+          if (!r.ok) return; // 실패하면 자유 시작(requiredChar=null)으로 폴백
+          const { word } = await r.json();
+          if (!word) return;
+          const cr = await fetch("/api/games/wordchain/check", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ word, usedWords: [], requiredChar: null }),
+          });
+          const data = await cr.json();
+          if (data.valid) { chain = [word]; requiredChar = data.nextChar; }
+        } catch (e) { /* 네트워크 오류 시 자유 시작으로 폴백 */ }
       }
 
       function tick() {

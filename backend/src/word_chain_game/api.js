@@ -3,11 +3,25 @@
 const express = require("express");
 const { pool } = require("../db");
 const stdict = require("../vowel_game/stdict");
+const puzzle = require("../vowel_game/puzzle");
 const { acceptableStarts } = require("./doeum");
 const { createProgressRouter } = require("../progress/api");
 
 const router = express.Router();
 router.use(createProgressRouter("wordchain")); // /level-clear, /progress
+
+// GET /start  → 서버가 랜덤으로 시작 단어를 하나 내려준다(플레이어가 매번 제일 쉬운 단어로
+// 시작하는 걸 방지 — 자모게임 puzzle.pickSeed와 동일한 시드 풀/가중치 재사용).
+router.get("/start", async (req, res) => {
+  try {
+    const seed = await puzzle.pickSeed(2, 3);
+    if (!seed) return res.status(503).json({ error: "no_seed_words" });
+    res.json({ word: seed.word });
+  } catch (e) {
+    console.error("wordchain/start error:", e.message);
+    res.status(500).json({ error: "server_error" });
+  }
+});
 
 function chars(word) {
   return Array.from(String(word || "").trim());
