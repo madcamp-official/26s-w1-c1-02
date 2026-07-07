@@ -63,6 +63,7 @@
       function showLevelSelect() {
         stop(); ended = true;
         const cleared = getCleared();
+        if (cleared > 0) reportLevelClear(cleared);
         let cells = "";
         for (let n = 1; n <= MAX_LEVEL; n++) {
           const st = n <= cleared ? "cleared" : n === cleared + 1 ? "current" : "locked";
@@ -158,8 +159,11 @@
         const word = input.value.trim(); if (!word) return;
         const elapsedMs = (cfg.timeLimit - remain) * 1000;
         try {
+          const token = localStorage.getItem("mgh.token");
+          const headers = { "Content-Type": "application/json" };
+          if (token) headers.Authorization = `Bearer ${token}`;
           const r = await fetch("/api/games/jamo/submit", {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST", headers,
             body: JSON.stringify({ puzzleId: puzzle.puzzleId, word, elapsedMs }),
           });
           const data = await r.json();
@@ -186,10 +190,21 @@
         showResult(`<span class="bad-msg">✕ ${msg}</span>`);
       }
 
+      function reportLevelClear(n) {
+        const token = localStorage.getItem("mgh.token");
+        if (!token) return;
+        fetch("/api/games/jamo/level-clear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ level: n }),
+        }).catch(() => {});
+      }
+
       function levelClear() {
         ended = true; stop();
         const wasNewUnlock = level > getCleared() && level < MAX_LEVEL;
         setCleared(Math.max(getCleared(), level));
+        reportLevelClear(level);
         overlay(`
           <div class="big">🏆</div>
           <h2>레벨 ${level} 클리어!</h2>
