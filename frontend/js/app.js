@@ -403,7 +403,31 @@
     return [content, null];
   }
 
+  // 로그인 상태면 자모(자음 모음 조합) 실제 레벨/진행도를 가져와 SOLO_GAMES에 반영
+  async function refreshVowelProgress() {
+    const token = localStorage.getItem("mgh.token");
+    if (!token) return;
+    try {
+      const res = await fetch("/api/games/jamo/progress", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const g = SOLO_GAMES.find((x) => x.id === "vowel");
+      if (!g) return;
+      const VOWEL_MAX_LEVEL = 20; // vowel-game.js의 MAX_LEVEL과 동일해야 함
+      const changed = g.lv !== data.level || g.done !== data.level || g.total !== VOWEL_MAX_LEVEL;
+      g.lv = data.level;
+      g.done = data.level;
+      g.total = VOWEL_MAX_LEVEL;
+      if (changed && state.view === "solo") render();
+    } catch (e) {
+      // 네트워크 오류 시 기존 표시값 유지
+    }
+  }
+
   function soloView() {
+    refreshVowelProgress();
     const items = SOLO_GAMES.map((g) => {
       const pct = Math.round((g.done / g.total) * 100);
       const badge = g.badge ? `<span class="badge ${g.badge.c}">${g.badge.t}</span>` : "";
@@ -415,7 +439,7 @@
               <div class="gi-title-row"><span class="gi-title">${g.title}</span>${badge}</div>
               <div class="gi-desc">${g.desc}</div>
             </div>
-            <div class="gi-right"><div class="gi-lv">Lv.${g.lv}</div><div class="gi-count">${g.done}/${g.total}</div></div>
+            <div class="gi-right"><div class="gi-lv">Lv.${g.lv}</div></div>
           </div>
           <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><div class="lbl">진행률 ${pct}%</div></div>
         </button>`;

@@ -5,6 +5,7 @@ const { migrate } = require("./db");
 const { attachRealtime } = require("./realtime/rooms");
 const signupRouter = require("./routes/signup");
 const loginRouter = require("./routes/login");
+const { optionalAuth } = require("./middleware/auth");
 const jamoApi = require("./vowel_game/api");
 
 const PORT = process.env.PORT || 8080;
@@ -19,7 +20,7 @@ app.use("/api", signupRouter);
 app.use("/api", loginRouter);
 
 // 게임 API — 자음 모음 조합 (PostgreSQL)
-app.use("/api/games/jamo", jamoApi);
+app.use("/api/games/jamo", optionalAuth, jamoApi);
 
 const server = http.createServer(app);
 
