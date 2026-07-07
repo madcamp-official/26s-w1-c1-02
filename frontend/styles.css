@@ -394,6 +394,12 @@ select.rm-input { appearance: none; cursor: pointer; }
 .vm-final-row.win { background: var(--accent-soft); }
 .vm-final-row .vm-pts { font-size: 16px; }
 .room-start-hint { text-align: center; color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
+/* 다른 그림 찾기(멀티): 칸 크기를 격자 수와 무관하게 일정하게 유지 → 11×11이어도 칸이 작아지지 않는다.
+   격자가 커지면 칸 수만큼 판이 넓어지고, 두 판은 가운데 정렬(혹시 넘치면 가로 스크롤). */
+.content.room-playing .sd-grid { --sd-cell: clamp(28px, 2.9vw, 44px); }
+.content.room-playing .sd-boards { display: flex; justify-content: safe center; gap: 16px; overflow-x: auto; }
+.content.room-playing .vm-wrap:has(.sd-wrap),
+.content.room-playing .vm-stage.sd-wrap { max-width: none; }
 /* 넓은 화면: 레일을 뷰포트 왼쪽 끝에 고정 — 오른쪽 끝의 채팅과 대칭. 가운데 정렬된 .main 폭과 무관하게
    항상 화면 왼쪽 끝에 붙는다(현재 문제·게임 화면 등 메인 레이아웃과 독립). */
 @media (min-width: 1240px) {

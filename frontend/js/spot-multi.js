@@ -25,7 +25,7 @@
         const data = side === "L" ? round.base : round.right;
         const cells = data.map((emo, i) =>
           `<div class="sd-cell" data-i="${i}" data-side="${side}">${escape(emo)}</div>`).join("");
-        return `<div class="sd-grid" style="grid-template-columns:repeat(${round.size},minmax(0,1fr))">${cells}</div>`;
+        return `<div class="sd-grid" style="grid-template-columns:repeat(${round.size},var(--sd-cell))">${cells}</div>`;
       }
 
       // ---------- 라운드 화면 ----------
