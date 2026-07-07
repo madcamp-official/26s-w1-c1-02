@@ -108,23 +108,26 @@
           ? `🟢 내 차례 — 상대 숫자를 추측하세요`
           : `⏳ ${escape(st ? st.turnName : "상대")}님의 차례`;
         container.innerHTML = `
-          <div class="vm-wrap bb-wrap">
-            <div class="vm-top bb-top">
-              <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="bb-time">${fmt(remain)}</div></div>
-              <div class="sd-pill"><div class="l">라운드</div><div class="v"><span id="bb-round">${st ? st.round : 1}</span></div></div>
-              <div class="sd-pill"><div class="l">자릿수</div><div class="v">${cfg.digits}자리</div></div>
-              <div style="flex:1"></div>
-              <div class="bb-turn ${myTurn ? "mine" : ""}" id="bb-turn">${turnText}</div>
-            </div>
-            <div class="bb-boards">
-              ${boardColumn(myId, true)}
-              ${boardColumn(oppId(), false)}
-            </div>
-            <div class="bb-inputbar" id="bb-inputbar">
-              <input class="bb-input" id="bb-guess" inputmode="numeric" autocomplete="off"
-                     maxlength="${cfg.digits}" placeholder="${"?".repeat(cfg.digits)}"${myTurn ? "" : " disabled"} />
-              <button class="btn primary" id="bb-guess-btn"${myTurn ? "" : " disabled"}>추측!</button>
-              <div class="bb-result" id="bb-guess-msg"></div>
+          <div class="vm-wrap">
+            <div class="vm-main">
+              <aside class="vm-rail">
+                <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="bb-time">${fmt(remain)}</div></div>
+                <div class="sd-pill"><div class="l">라운드</div><div class="v"><span id="bb-round">${st ? st.round : 1}</span></div></div>
+                <div class="sd-pill"><div class="l">자릿수</div><div class="v">${cfg.digits}자리</div></div>
+                <div class="bb-turn ${myTurn ? "mine" : ""}" id="bb-turn">${turnText}</div>
+              </aside>
+              <div class="vm-stage bb-stage">
+                <div class="bb-boards">
+                  ${boardColumn(myId, true)}
+                  ${boardColumn(oppId(), false)}
+                </div>
+                <div class="bb-inputbar" id="bb-inputbar">
+                  <input class="bb-input" id="bb-guess" inputmode="numeric" autocomplete="off"
+                         maxlength="${cfg.digits}" placeholder="${"?".repeat(cfg.digits)}"${myTurn ? "" : " disabled"} />
+                  <button class="btn primary" id="bb-guess-btn"${myTurn ? "" : " disabled"}>추측!</button>
+                  <div class="bb-result" id="bb-guess-msg"></div>
+                </div>
+              </div>
             </div>
           </div>`;
         const inp = $("#bb-guess");

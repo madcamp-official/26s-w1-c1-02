@@ -33,15 +33,15 @@
         mySolved = false; locked = false;
         container.innerHTML = `
           <div class="vm-wrap">
-            <div class="vm-top">
-              <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="sm-time">${fmt(remain)}</div></div>
-              <div class="sd-pill"><div class="l">문제</div><div class="v"><span id="sm-idx">${round.index}</span> / ${round.total}</div></div>
-              <div class="sd-pill"><div class="l">난이도</div><div class="v">${escape(round.difficultyLabel)}</div></div>
-              <div style="flex:1"></div>
-              <div class="vm-solvedbar">찾은 사람 <b id="sm-solved">0</b> / <span id="sm-total">${scores.length || "?"}</span></div>
-            </div>
             <div class="vm-main">
-              <div class="sd-wrap">
+              <aside class="vm-rail">
+                <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="sm-time">${fmt(remain)}</div></div>
+                <div class="sd-pill"><div class="l">문제</div><div class="v"><span id="sm-idx">${round.index}</span> / ${round.total}</div></div>
+                <div class="sd-pill"><div class="l">난이도</div><div class="v">${escape(round.difficultyLabel)}</div></div>
+                <div class="vm-solvedbar">찾은 사람 <b id="sm-solved">0</b> / <span id="sm-total">${scores.length || "?"}</span></div>
+                <div class="vm-score" id="sm-score"></div>
+              </aside>
+              <div class="vm-stage sd-wrap">
                 <div class="vg-caption">두 그림에서 <b>단 하나</b> 다른 칸을 먼저 찾아 클릭하세요!</div>
                 <div class="sd-boards">
                   <div class="sd-board"><div class="cap">원본</div>${boardHtml("L")}</div>
@@ -49,7 +49,6 @@
                 </div>
                 <div class="vg-result" id="sm-result"></div>
               </div>
-              <aside class="vm-score" id="sm-score"></aside>
             </div>
           </div>`;
         container.querySelectorAll(".sd-cell").forEach((el) =>

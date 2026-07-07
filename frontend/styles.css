@@ -355,13 +355,19 @@ select.rm-input { appearance: none; cursor: pointer; }
 .modal p { color: var(--ink-soft); margin: 0 0 20px; }
 .modal .row { display: flex; gap: 10px; justify-content: center; }
 
-/* ---------- Multiplayer vowel (실시간 대전) ---------- */
-.vm-wrap { max-width: 860px; margin: 0 auto; }
+/* ---------- Multiplayer 공통 레이아웃 (실시간 대전) ---------- */
+/* 기본 배치: 메타 정보(남은 시간·문제·난이도·점수판·차례 등)는 왼쪽 레일(.vm-rail)에 세로로 모아 고정하고,
+   가운데(.vm-stage)를 게임 화면에 내준다. 오른쪽에 고정된 채팅과 대칭. 인간프린터(11×11)처럼 큰 이미지도
+   가려지지 않는다. 새로 추가되는 멀티 게임도 이 vm-main > (vm-rail + vm-stage) 구조만 따르면 같은 배치가 된다. */
+.vm-wrap { max-width: 1120px; margin: 0 auto; }
 .vm-waiting { text-align: center; color: var(--muted); padding: 60px 0; }
 .vm-top { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
 .vm-solvedbar { font-size: 14px; color: var(--ink-soft); }
 .vm-solvedbar b { color: var(--accent); font-size: 18px; }
-.vm-main { display: grid; grid-template-columns: 1fr 200px; gap: 18px; align-items: start; }
+.vm-main { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
+.vm-rail { display: flex; flex-direction: column; gap: 10px; align-self: start; position: sticky; top: calc(var(--nav-h) + 18px); }
+.vm-rail .sd-pill { padding: 8px 14px; }
+.vm-stage { min-width: 0; }
 .vm-hint { text-align: center; margin: 4px 0 14px; color: var(--ink-soft); font-size: 15px; letter-spacing: 2px; }
 .vm-hint b { color: var(--accent); }
 .vm-score { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; }
@@ -386,7 +392,11 @@ select.rm-input { appearance: none; cursor: pointer; }
 .vm-final-row.win { background: var(--accent-soft); }
 .vm-final-row .vm-pts { font-size: 16px; }
 .room-start-hint { text-align: center; color: var(--muted); font-size: 13px; margin: -6px 0 10px; }
-@media (max-width: 720px) { .vm-main { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .vm-main { grid-template-columns: 1fr; }
+  .vm-rail { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .vm-rail .vm-score { flex-basis: 100%; }
+}
 
 /* ---------- Login screen ---------- */
 .login-shell {
@@ -510,8 +520,9 @@ input[type="range"]::-moz-range-thumb {
 /* ===== 숫자야구 멀티 (baseball-multi.js) ===== */
 .bb-wrap { display: flex; flex-direction: column; gap: 16px; }
 .bb-top.vm-top { flex-wrap: wrap; align-items: center; }
+.bb-stage { display: flex; flex-direction: column; gap: 16px; }
 .bb-turn {
-  padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 14px;
+  padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 14px; text-align: center;
   background: var(--card); color: var(--ink-soft); border: 1px solid var(--border);
 }
 .bb-turn.mine { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); }

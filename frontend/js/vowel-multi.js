@@ -49,15 +49,15 @@
         mySolved = false;
         container.innerHTML = `
           <div class="vm-wrap">
-            <div class="vm-top">
-              <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="vm-time">${fmt(remain)}</div></div>
-              <div class="sd-pill"><div class="l">문제</div><div class="v"><span id="vm-idx">${round.index}</span> / ${round.total}</div></div>
-              <div class="sd-pill"><div class="l">난이도</div><div class="v">${escape(round.difficultyLabel)}</div></div>
-              <div style="flex:1"></div>
-              <div class="vm-solvedbar">맞힌 사람 <b id="vm-solved">0</b> / <span id="vm-total">${scores.length || "?"}</span></div>
-            </div>
             <div class="vm-main">
-              <div class="vg-board">
+              <aside class="vm-rail">
+                <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="vm-time">${fmt(remain)}</div></div>
+                <div class="sd-pill"><div class="l">문제</div><div class="v"><span id="vm-idx">${round.index}</span> / ${round.total}</div></div>
+                <div class="sd-pill"><div class="l">난이도</div><div class="v">${escape(round.difficultyLabel)}</div></div>
+                <div class="vm-solvedbar">맞힌 사람 <b id="vm-solved">0</b> / <span id="vm-total">${scores.length || "?"}</span></div>
+                <div class="vm-score" id="vm-score"></div>
+              </aside>
+              <div class="vm-stage vg-board">
                 <div class="vg-caption">이 자음·모음을 <b>모두 사용</b>해 단어를 만드세요 · 정답 후보 ${round.solutionCount}개</div>
                 <div class="vg-tiles" id="vm-tiles">${round.jamo.map((j) => `<div class="vg-tile">${escape(j)}</div>`).join("")}</div>
                 <div class="vm-hint" id="vm-hint" hidden></div>
@@ -68,7 +68,6 @@
                 <div class="vg-result" id="vm-result"></div>
                 <div class="vm-reveal" id="vm-reveal" hidden></div>
               </div>
-              <aside class="vm-score" id="vm-score"></aside>
             </div>
           </div>`;
         const input = $("#vm-input");
