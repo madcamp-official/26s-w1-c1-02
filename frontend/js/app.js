@@ -403,31 +403,38 @@
     return [content, null];
   }
 
-  // 로그인 상태면 자모(자음 모음 조합) 실제 레벨/진행도를 가져와 SOLO_GAMES에 반영
-  async function refreshVowelProgress() {
+  // 로그인 상태면 레벨제 솔로 게임들의 실제 레벨/진행도를 가져와 SOLO_GAMES에 반영.
+  // apiPath/maxLevel은 각 게임 클라이언트(vowel-game.js/spot-difference.js)의 값과 동일해야 함.
+  const PROGRESS_GAMES = [
+    { id: "vowel", apiPath: "jamo", maxLevel: 20 },
+    { id: "spot", apiPath: "spot", maxLevel: 20 },
+  ];
+  async function refreshSoloProgress() {
     const token = localStorage.getItem("mgh.token");
     if (!token) return;
-    try {
-      const res = await fetch("/api/games/jamo/progress", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const g = SOLO_GAMES.find((x) => x.id === "vowel");
-      if (!g) return;
-      const VOWEL_MAX_LEVEL = 20; // vowel-game.js의 MAX_LEVEL과 동일해야 함
-      const changed = g.lv !== data.level || g.done !== data.level || g.total !== VOWEL_MAX_LEVEL;
-      g.lv = data.level;
-      g.done = data.level;
-      g.total = VOWEL_MAX_LEVEL;
-      if (changed && state.view === "solo") render();
-    } catch (e) {
-      // 네트워크 오류 시 기존 표시값 유지
-    }
+    let changed = false;
+    await Promise.all(PROGRESS_GAMES.map(async ({ id, apiPath, maxLevel }) => {
+      try {
+        const res = await fetch(`/api/games/${apiPath}/progress`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const g = SOLO_GAMES.find((x) => x.id === id);
+        if (!g) return;
+        if (g.lv !== data.level || g.done !== data.level || g.total !== maxLevel) changed = true;
+        g.lv = data.level;
+        g.done = data.level;
+        g.total = maxLevel;
+      } catch (e) {
+        // 네트워크 오류 시 기존 표시값 유지
+      }
+    }));
+    if (changed && state.view === "solo") render();
   }
 
   function soloView() {
-    refreshVowelProgress();
+    refreshSoloProgress();
     const items = SOLO_GAMES.map((g) => {
       const pct = Math.round((g.done / g.total) * 100);
       const badge = g.badge ? `<span class="badge ${g.badge.c}">${g.badge.t}</span>` : "";

@@ -9,6 +9,7 @@ const { optionalAuth } = require("./middleware/auth");
 const oauthRouter = require("./routes/oauth");
 const jamoApi = require("./vowel_game/api");
 const { cleanupExpiredPuzzles } = require("./vowel_game/puzzle");
+const { createProgressRouter } = require("./progress/api");
 
 const PORT = process.env.PORT || 8080;
 
@@ -26,6 +27,9 @@ app.use("/auth", oauthRouter);
 
 // 게임 API — 자음 모음 조합 (PostgreSQL)
 app.use("/api/games/jamo", optionalAuth, jamoApi);
+
+// 게임 API — 다른 그림 찾기 (싱글 로직은 클라이언트 전용, 레벨 진행도만 서버에 저장)
+app.use("/api/games/spot", optionalAuth, createProgressRouter("spot"));
 
 const server = http.createServer(app);
 

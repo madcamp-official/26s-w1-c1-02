@@ -52,10 +52,37 @@
       const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
       const $ = (sel) => container.querySelector(sel);
 
+      // 로그인 유저의 클리어 레벨을 서버에 반영(로컬→서버). 실패해도 로컬 진행은 그대로 유지.
+      function reportLevelClear(n) {
+        const token = localStorage.getItem("mgh.token");
+        if (!token) return;
+        fetch("/api/games/spot/level-clear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ level: n }),
+        }).catch(() => {});
+      }
+
+      // 서버에 저장된 진행도가 로컬(이 브라우저)보다 앞서 있으면 반영 — 다른 기기/브라우저 대비.
+      async function syncFromServer() {
+        const token = localStorage.getItem("mgh.token");
+        if (!token) return;
+        try {
+          const r = await fetch("/api/games/spot/progress", { headers: { Authorization: `Bearer ${token}` } });
+          if (!r.ok) return;
+          const data = await r.json();
+          if (typeof data.level === "number" && data.level > getCleared()) {
+            setCleared(data.level);
+            if (ended) showLevelSelect(); // 아직 레벨 선택 화면이면 갱신, 플레이 중이면 다음 방문 때 반영
+          }
+        } catch (e) { /* 네트워크 오류 시 로컬 값 유지 */ }
+      }
+
       // ================= 레벨 선택 =================
       function showLevelSelect() {
         stop(); ended = true; round = null;
         const cleared = getCleared();
+        if (cleared > 0) reportLevelClear(cleared);
         let cells = "";
         for (let n = 1; n <= MAX_LEVEL; n++) {
           const st = n <= cleared ? "cleared" : n === cleared + 1 ? "current" : "locked";
@@ -138,6 +165,7 @@
         const used = cfg.seconds - seconds;
         const wasNewUnlock = level > getCleared() && level < MAX_LEVEL;
         setCleared(Math.max(getCleared(), level));
+        reportLevelClear(level);
         overlay(`
           <div class="big">🎉</div>
           <h2>레벨 ${level} 클리어!</h2>
@@ -182,6 +210,7 @@
       }
 
       showLevelSelect();
+      syncFromServer();
       return () => stop();
     },
   };
