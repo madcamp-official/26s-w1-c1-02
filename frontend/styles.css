@@ -506,4 +506,77 @@ input[type="range"]::-moz-range-thumb {
   width: 100%; padding: 13px 0; border-radius: 12px; border: 1px solid var(--border);
   background: var(--card); color: var(--danger); font-size: 14px; font-weight: 700; cursor: pointer;
 }
+
+/* ===== 숫자야구 멀티 (baseball-multi.js) ===== */
+.bb-wrap { display: flex; flex-direction: column; gap: 16px; }
+.bb-top.vm-top { flex-wrap: wrap; align-items: center; }
+.bb-turn {
+  padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 14px;
+  background: var(--card); color: var(--ink-soft); border: 1px solid var(--border);
+}
+.bb-turn.mine { background: var(--accent-soft); color: var(--ink); border-color: var(--accent); }
+
+/* 설정 화면 */
+.bb-setup { display: grid; place-items: center; padding: 30px 0; }
+.bb-setup-card {
+  width: min(440px, 92%); text-align: center; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px 24px;
+}
+.bb-title { font-size: 26px; font-weight: 900; color: var(--ink); }
+.bb-sub { margin: 8px 0 18px; color: var(--ink-soft); font-size: 15px; }
+.bb-hint { margin-top: 16px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.bb-mynum { font-size: 20px; color: var(--ink); margin: 6px 0; letter-spacing: 3px; }
+.bb-mynum b { color: var(--accent); font-size: 28px; }
+.bb-waiting { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.bb-input {
+  width: 100%; text-align: center; font-size: 30px; font-weight: 800; letter-spacing: 10px;
+  padding: 12px 8px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--card); color: var(--ink); outline: none;
+}
+.bb-input:focus { border-color: var(--accent); background: var(--surface); }
+.bb-input:disabled { opacity: .5; }
+.bb-submit { width: 100%; margin-top: 14px; }
+.bb-result { min-height: 22px; margin: 8px 0 0; font-size: 14px; }
+
+/* 대결 보드 */
+.bb-boards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.bb-col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px; min-height: 160px; }
+.bb-col.mine { border-color: var(--accent); }
+.bb-col-cap { font-size: 13px; font-weight: 800; color: var(--ink-soft); margin-bottom: 8px; }
+.bb-col.mine .bb-col-cap { color: var(--accent); }
+.bb-rows { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.bb-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
+.bb-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: var(--card); }
+.bb-row.hr { background: var(--accent-soft); }
+.bb-no { font-size: 12px; color: var(--muted); width: 18px; }
+.bb-num { font-size: 18px; font-weight: 800; letter-spacing: 3px; color: var(--ink); }
+.bb-verdict { margin-left: auto; display: flex; gap: 4px; }
+.bb-v { font-size: 12px; font-weight: 800; padding: 2px 7px; border-radius: 8px; }
+.bb-v.s { background: #e8f0dd; color: #4d6b32; }
+.bb-v.b { background: #fbecd9; color: #9a6a2f; }
+.bb-v.out { background: var(--card-strong); color: var(--muted); }
+.bb-v.hr { background: var(--gold); color: #fff; }
+:root[data-theme="dark"] .bb-v.s { background: #2e3a26; color: #a7c48a; }
+:root[data-theme="dark"] .bb-v.b { background: #3d3220; color: #d9b071; }
+
+/* 입력 바 */
+.bb-inputbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.bb-inputbar .bb-input { flex: 1; min-width: 140px; font-size: 24px; letter-spacing: 8px; padding: 10px; }
+.bb-inputbar .btn { padding: 12px 22px; font-size: 16px; }
+.bb-inputbar .bb-result { flex-basis: 100%; }
+.bb-inline { color: var(--ink-soft); font-weight: 700; }
+
+/* 종료 오버레이 */
+.bb-over .big.win { color: var(--ok); }
+.bb-over .big.lose { color: var(--danger); }
+.bb-over .big.draw { color: var(--accent); }
+.bb-final { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.bb-final-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border-radius: 10px; background: var(--card); font-size: 14px; }
+.bb-final-row.win { background: var(--accent-soft); }
+.bb-final-name { font-weight: 800; color: var(--ink); }
+.bb-final-secret { color: var(--ink-soft); }
+.bb-final-secret b { color: var(--accent); letter-spacing: 2px; }
+.bb-final-tries { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 560px) { .bb-boards { grid-template-columns: 1fr; } }
 .logout-btn:hover { background: var(--danger); color: #fff; border-color: transparent; }

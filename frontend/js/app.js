@@ -42,6 +42,27 @@
 
   const DIFF_LABEL = { 1: "쉬움", 2: "보통", 3: "어려움", 4: "세종대왕" };
 
+  // 실시간 게임 엔진을 마운트하는 모드 / 1대1 전용(정원 2) 모드
+  const ENGINE_MODES = new Set(["vowel", "spot", "baseball"]);
+  const DUEL_MODES = new Set(["baseball"]);
+  const isEngineMode = (m) => ENGINE_MODES.has(m);
+
+  // 모드별 설정 UI 메타 — 난이도 라벨/옵션, 라운드(문제 수/기회) 라벨·범위
+  function cfgMeta(mode) {
+    if (mode === "baseball") {
+      return {
+        diffLabel: "자릿수", diffOptions: [[1, "3자리"], [2, "4자리"]], diffDef: 1,
+        roundsLabel: "기회", roundsUnit: "회", roundsMin: 5, roundsMax: 15, roundsDef: 9,
+        tagDiff: (d) => (String(d) === "2" ? "4자리" : "3자리"),
+      };
+    }
+    return {
+      diffLabel: "난이도", diffOptions: [[1, "쉬움"], [2, "보통"], [3, "어려움"], [4, "세종대왕"]], diffDef: 2,
+      roundsLabel: "문제 수", roundsUnit: "개", roundsMin: 3, roundsMax: 20, roundsDef: 8,
+      tagDiff: (d) => DIFF_LABEL[d] || "?",
+    };
+  }
+
   // ---- realtime: 로비 채팅 + 멀티플레이 방 (Socket.IO) ----
   const net = {
     socket: null, connected: false, listeners: new Set(),
@@ -533,16 +554,11 @@
             </select>
           </div>
           <div class="rm-field vowel-cfg" id="rc-vowel-cfg" hidden>
-            <label for="rc-diff">난이도</label>
-            <select class="rm-input" id="rc-diff">
-              <option value="1">쉬움</option>
-              <option value="2" selected>보통</option>
-              <option value="3">어려움</option>
-              <option value="4">세종대왕</option>
-            </select>
-            <div class="rm-slider-label" style="margin-top:12px">문제 수: <span id="rc-rounds-val">8</span>개</div>
+            <label for="rc-diff" id="rc-diff-label">난이도</label>
+            <select class="rm-input" id="rc-diff"></select>
+            <div class="rm-slider-label" style="margin-top:12px"><span id="rc-rounds-label">문제 수</span>: <span id="rc-rounds-val">8</span><span id="rc-rounds-unit">개</span></div>
             <input type="range" min="3" max="20" step="1" value="8" id="rc-rounds" />
-            <div class="rm-slider-ends"><span>3개</span><span>20개</span></div>
+            <div class="rm-slider-ends"><span id="rc-rounds-lo">3개</span><span id="rc-rounds-hi">20개</span></div>
           </div>
           <div class="rm-field">
             <div class="rm-slider-label">최대 인원: <span id="rc-max-val">6</span>명</div>
@@ -569,12 +585,33 @@
     const maxSlider = o.querySelector("#rc-max"), maxVal = o.querySelector("#rc-max-val");
     maxSlider.addEventListener("input", () => { maxVal.textContent = maxSlider.value; });
 
-    // 자음·모음 조합 모드에서만 난이도/문제 수 노출
+    // 실시간 게임 모드에서만 설정(난이도/문제 수 또는 자릿수/기회) 노출
     const modeSel = o.querySelector("#rc-mode");
     const vowelCfg = o.querySelector("#rc-vowel-cfg");
+    const diffSel = o.querySelector("#rc-diff");
     const roundsSlider = o.querySelector("#rc-rounds"), roundsVal = o.querySelector("#rc-rounds-val");
     roundsSlider.addEventListener("input", () => { roundsVal.textContent = roundsSlider.value; });
-    const syncVowelCfg = () => { vowelCfg.hidden = modeSel.value !== "vowel" && modeSel.value !== "spot"; };
+    const syncVowelCfg = () => {
+      const mode = modeSel.value;
+      vowelCfg.hidden = !isEngineMode(mode);
+      const meta = cfgMeta(mode);
+      // 난이도/자릿수 옵션 재구성
+      o.querySelector("#rc-diff-label").textContent = meta.diffLabel;
+      diffSel.innerHTML = meta.diffOptions
+        .map(([v, lb]) => `<option value="${v}"${v === meta.diffDef ? " selected" : ""}>${lb}</option>`).join("");
+      // 문제 수/기회 슬라이더 범위·라벨 재구성
+      o.querySelector("#rc-rounds-label").textContent = meta.roundsLabel;
+      o.querySelector("#rc-rounds-unit").textContent = meta.roundsUnit;
+      o.querySelector("#rc-rounds-lo").textContent = meta.roundsMin + meta.roundsUnit;
+      o.querySelector("#rc-rounds-hi").textContent = meta.roundsMax + meta.roundsUnit;
+      roundsSlider.min = meta.roundsMin; roundsSlider.max = meta.roundsMax; roundsSlider.value = meta.roundsDef;
+      roundsVal.textContent = meta.roundsDef;
+      // 1대1 전용 모드: 정원 2명 고정
+      const duel = DUEL_MODES.has(mode);
+      if (duel) { maxSlider.value = 2; maxVal.textContent = 2; }
+      maxSlider.disabled = duel;
+      maxSlider.closest(".rm-field").style.opacity = duel ? ".5" : "";
+    };
     modeSel.addEventListener("change", syncVowelCfg);
     syncVowelCfg();
 
@@ -775,7 +812,7 @@
     const input = el.querySelector("#room-chat-input");
     function paint() {
       const room = net.room;
-      const inGame = !!(room && room.state === "play" && (room.mode === "vowel" || room.mode === "spot"));
+      const inGame = !!(room && room.state === "play" && isEngineMode(room.mode));
       el.classList.toggle("in-game", inGame);
       count.textContent = `${net.room ? net.room.players.length : 0}명`;
       scroll.innerHTML = net.roomChat.map((m) =>
@@ -810,7 +847,9 @@
     function mountGame(mode) {
       root.innerHTML = "";
       gameMounted = true; gameFinished = false;
-      const engine = mode === "spot" ? window.SpotMulti : window.VowelMulti;
+      const engine = mode === "spot" ? window.SpotMulti
+        : mode === "baseball" ? window.BaseballMulti
+        : window.VowelMulti;
       gameCleanup = engine.mount(root, {
         socket: net.socket,
         onExit: exitGame,
@@ -844,7 +883,7 @@
       if (!room) { unmountGame(); go("multi"); return; }
 
       // 실시간 게임 진행 중 → 게임 화면을 마운트하고 이후 재렌더는 게임이 자체 관리
-      if (room.state === "play" && (room.mode === "vowel" || room.mode === "spot")) {
+      if (room.state === "play" && isEngineMode(room.mode)) {
         if (!gameMounted) mountGame(room.mode);
         return;
       }
@@ -858,8 +897,9 @@
 
       const isHost = !!(net.socket && room.hostId === net.socket.id);
       const meId = net.socket && net.socket.id;
-      // 난이도·문제 수 설정을 쓰는 게임(자음·모음 조합 / 다른 그림 찾기)
-      const isVowel = room.mode === "vowel" || room.mode === "spot";
+      // 난이도·문제 수(또는 자릿수·기회) 설정을 쓰는 실시간 게임
+      const isVowel = isEngineMode(room.mode);
+      const meta = cfgMeta(room.mode);
       const modeOptions = (net.modes.length ? net.modes : [{ id: room.mode, label: modeLabel(room.mode) }])
         .map((m) => `<option value="${m.id}"${m.id === room.mode ? " selected" : ""}>${escape(m.label)}</option>`).join("");
       // 시작 게이트: 방장 제외 전원 준비 + (2명 이상)
@@ -901,19 +941,19 @@
                 <div class="rgm-label">게임 모드</div>
                 <select class="rm-input" id="room-mode">${modeOptions}</select>
                 ${isVowel ? `
-                <div class="rgm-label" style="margin-top:10px">난이도</div>
+                <div class="rgm-label" style="margin-top:10px">${meta.diffLabel}</div>
                 <select class="rm-input" id="room-diff">
-                  ${[1, 2, 3, 4].map((v) => `<option value="${v}"${room.difficulty === v ? " selected" : ""}>${DIFF_LABEL[v]}</option>`).join("")}
+                  ${meta.diffOptions.map(([v, lb]) => `<option value="${v}"${room.difficulty === v ? " selected" : ""}>${lb}</option>`).join("")}
                 </select>
-                <div class="rgm-label" style="margin-top:10px">문제 수: <span id="room-rounds-val">${room.rounds}</span>개</div>
-                <input type="range" min="3" max="20" step="1" value="${room.rounds}" id="room-rounds" />` : ""}
+                <div class="rgm-label" style="margin-top:10px">${meta.roundsLabel}: <span id="room-rounds-val">${room.rounds}</span>${meta.roundsUnit}</div>
+                <input type="range" min="${meta.roundsMin}" max="${meta.roundsMax}" step="1" value="${room.rounds}" id="room-rounds" />` : ""}
               </div>
             </div>` : ""}
           </div>
         </div>
         <div class="room-info-line">
           ${isHost ? "" : `<span class="room-mode-tag">${escape(modeLabel(room.mode))}</span>`}
-          ${isVowel ? `<span class="room-mode-tag">${DIFF_LABEL[room.difficulty] || "?"} · ${room.rounds}문제</span>` : ""}
+          ${isVowel ? `<span class="room-mode-tag">${meta.tagDiff(room.difficulty)} · ${room.rounds}${meta.roundsUnit}</span>` : ""}
           <span class="state ${room.state === "wait" ? "wait" : "play"}">${room.state === "wait" ? "대기중" : "게임중"}</span>
           <span class="room-info-meta">코드 ${escape(String(room.id).toUpperCase())}${room.locked ? " · 🔒" : ""} · ${room.players.length}/${room.maxPlayers}</span>
         </div>
