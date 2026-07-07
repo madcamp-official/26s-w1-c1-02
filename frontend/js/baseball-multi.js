@@ -25,7 +25,7 @@
       const onFinish = typeof opts.onFinish === "function" ? opts.onFinish : () => {};
       const myId = socket.id;
 
-      let cfg = { digits: 3, maxGuesses: 9, players: [] };
+      let cfg = { digits: 3, players: [] };
       let phase = "setup";
       let st = null;                 // 최신 baseball:state
       let boards = {};               // id -> [guess]
@@ -111,7 +111,7 @@
           <div class="vm-wrap bb-wrap">
             <div class="vm-top bb-top">
               <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="bb-time">${fmt(remain)}</div></div>
-              <div class="sd-pill"><div class="l">라운드</div><div class="v"><span id="bb-round">${st ? st.round : 1}</span> / ${cfg.maxGuesses}</div></div>
+              <div class="sd-pill"><div class="l">라운드</div><div class="v"><span id="bb-round">${st ? st.round : 1}</span></div></div>
               <div class="sd-pill"><div class="l">자릿수</div><div class="v">${cfg.digits}자리</div></div>
               <div style="flex:1"></div>
               <div class="bb-turn ${myTurn ? "mine" : ""}" id="bb-turn">${turnText}</div>
@@ -169,7 +169,7 @@
 
       // ---------- 소켓 이벤트 ----------
       const onSetup = (data) => {
-        cfg = { digits: data.digits, maxGuesses: data.maxGuesses, players: data.players || [] };
+        cfg = { digits: data.digits, players: data.players || [] };
         phase = "setup"; mySecret = null; readyIds = []; boards = {};
         renderSetup();
       };

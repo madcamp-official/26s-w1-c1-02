@@ -50,15 +50,16 @@
   // 모드별 설정 UI 메타 — 난이도 라벨/옵션, 라운드(문제 수/기회) 라벨·범위
   function cfgMeta(mode) {
     if (mode === "baseball") {
+      // 횟수 제한 없음 — 먼저 맞히는 사람이 승리. 라운드 설정 미노출(hasRounds:false)
       return {
         diffLabel: "자릿수", diffOptions: [[1, "3자리"], [2, "4자리"]], diffDef: 1,
-        roundsLabel: "기회", roundsUnit: "회", roundsMin: 5, roundsMax: 15, roundsDef: 9,
+        hasRounds: false, roundsUnit: "",
         tagDiff: (d) => (String(d) === "2" ? "4자리" : "3자리"),
       };
     }
     return {
       diffLabel: "난이도", diffOptions: [[1, "쉬움"], [2, "보통"], [3, "어려움"], [4, "세종대왕"]], diffDef: 2,
-      roundsLabel: "문제 수", roundsUnit: "개", roundsMin: 3, roundsMax: 20, roundsDef: 8,
+      hasRounds: true, roundsLabel: "문제 수", roundsUnit: "개", roundsMin: 3, roundsMax: 20, roundsDef: 8,
       tagDiff: (d) => DIFF_LABEL[d] || "?",
     };
   }
@@ -556,9 +557,11 @@
           <div class="rm-field vowel-cfg" id="rc-vowel-cfg" hidden>
             <label for="rc-diff" id="rc-diff-label">난이도</label>
             <select class="rm-input" id="rc-diff"></select>
-            <div class="rm-slider-label" style="margin-top:12px"><span id="rc-rounds-label">문제 수</span>: <span id="rc-rounds-val">8</span><span id="rc-rounds-unit">개</span></div>
-            <input type="range" min="3" max="20" step="1" value="8" id="rc-rounds" />
-            <div class="rm-slider-ends"><span id="rc-rounds-lo">3개</span><span id="rc-rounds-hi">20개</span></div>
+            <div id="rc-rounds-wrap">
+              <div class="rm-slider-label" style="margin-top:12px"><span id="rc-rounds-label">문제 수</span>: <span id="rc-rounds-val">8</span><span id="rc-rounds-unit">개</span></div>
+              <input type="range" min="3" max="20" step="1" value="8" id="rc-rounds" />
+              <div class="rm-slider-ends"><span id="rc-rounds-lo">3개</span><span id="rc-rounds-hi">20개</span></div>
+            </div>
           </div>
           <div class="rm-field">
             <div class="rm-slider-label">최대 인원: <span id="rc-max-val">6</span>명</div>
@@ -599,13 +602,16 @@
       o.querySelector("#rc-diff-label").textContent = meta.diffLabel;
       diffSel.innerHTML = meta.diffOptions
         .map(([v, lb]) => `<option value="${v}"${v === meta.diffDef ? " selected" : ""}>${lb}</option>`).join("");
-      // 문제 수/기회 슬라이더 범위·라벨 재구성
-      o.querySelector("#rc-rounds-label").textContent = meta.roundsLabel;
-      o.querySelector("#rc-rounds-unit").textContent = meta.roundsUnit;
-      o.querySelector("#rc-rounds-lo").textContent = meta.roundsMin + meta.roundsUnit;
-      o.querySelector("#rc-rounds-hi").textContent = meta.roundsMax + meta.roundsUnit;
-      roundsSlider.min = meta.roundsMin; roundsSlider.max = meta.roundsMax; roundsSlider.value = meta.roundsDef;
-      roundsVal.textContent = meta.roundsDef;
+      // 문제 수/기회 슬라이더 — hasRounds 인 모드만 노출(숫자야구는 제한 없음)
+      o.querySelector("#rc-rounds-wrap").hidden = !meta.hasRounds;
+      if (meta.hasRounds) {
+        o.querySelector("#rc-rounds-label").textContent = meta.roundsLabel;
+        o.querySelector("#rc-rounds-unit").textContent = meta.roundsUnit;
+        o.querySelector("#rc-rounds-lo").textContent = meta.roundsMin + meta.roundsUnit;
+        o.querySelector("#rc-rounds-hi").textContent = meta.roundsMax + meta.roundsUnit;
+        roundsSlider.min = meta.roundsMin; roundsSlider.max = meta.roundsMax; roundsSlider.value = meta.roundsDef;
+        roundsVal.textContent = meta.roundsDef;
+      }
       // 1대1 전용 모드: 정원 2명 고정
       const duel = DUEL_MODES.has(mode);
       if (duel) { maxSlider.value = 2; maxVal.textContent = 2; }
@@ -945,15 +951,16 @@
                 <select class="rm-input" id="room-diff">
                   ${meta.diffOptions.map(([v, lb]) => `<option value="${v}"${room.difficulty === v ? " selected" : ""}>${lb}</option>`).join("")}
                 </select>
+                ${meta.hasRounds ? `
                 <div class="rgm-label" style="margin-top:10px">${meta.roundsLabel}: <span id="room-rounds-val">${room.rounds}</span>${meta.roundsUnit}</div>
-                <input type="range" min="${meta.roundsMin}" max="${meta.roundsMax}" step="1" value="${room.rounds}" id="room-rounds" />` : ""}
+                <input type="range" min="${meta.roundsMin}" max="${meta.roundsMax}" step="1" value="${room.rounds}" id="room-rounds" />` : ""}` : ""}
               </div>
             </div>` : ""}
           </div>
         </div>
         <div class="room-info-line">
           ${isHost ? "" : `<span class="room-mode-tag">${escape(modeLabel(room.mode))}</span>`}
-          ${isVowel ? `<span class="room-mode-tag">${meta.tagDiff(room.difficulty)} · ${room.rounds}${meta.roundsUnit}</span>` : ""}
+          ${isVowel ? `<span class="room-mode-tag">${meta.tagDiff(room.difficulty)}${meta.hasRounds ? ` · ${room.rounds}${meta.roundsUnit}` : ""}</span>` : ""}
           <span class="state ${room.state === "wait" ? "wait" : "play"}">${room.state === "wait" ? "대기중" : "게임중"}</span>
           <span class="room-info-meta">코드 ${escape(String(room.id).toUpperCase())}${room.locked ? " · 🔒" : ""} · ${room.players.length}/${room.maxPlayers}</span>
         </div>

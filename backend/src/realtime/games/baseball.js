@@ -3,15 +3,15 @@
 // rooms.js 가 room:start 시 생성하고 room.game 에 붙인다. 반드시 참가자 2명.
 //
 // 흐름: setup(양쪽이 비밀 숫자 설정) → play(번갈아 상대 숫자 추측, 서버가 S/B/Out 판정)
-//       → over(홈런 or 기회 소진). 각 라운드는 양쪽이 한 번씩 추측하는 단위(공평성 보장).
+//       → over. 각 라운드는 양쪽이 한 번씩 추측하는 단위(공평성 보장).
 // 판정: 스트라이크=값·자리 일치, 볼=값은 있으나 자리 다름, 아웃=정답에 없음. 홈런=전부 스트라이크.
-// 승패: 같은 라운드에 둘 다 홈런이면 무승부, 한쪽만 홈런이면 그 사람 승. 아무도 못 맞히고
-//       기회를 다 쓰면 무승부. 한쪽이 먼저 홈런해도 상대에게 그 라운드의 마지막 기회를 준다.
+// 승패: **먼저 맞히는 사람이 승리** — 라운드 수 제한 없이 홈런이 나올 때까지 계속한다.
+//       같은 라운드에 둘 다 홈런이면 무승부, 한쪽만 홈런이면 그 사람 승. 한쪽이 먼저 홈런해도
+//       상대에게 그 라운드의 마지막 기회를 준다. (양쪽이 한 라운드 내내 아무 추측도 안 하면 무승부로 종료)
 
-// difficulty(1~2) → 자릿수 / rounds → 기회(추측 횟수)
+// difficulty(1~2) → 자릿수
 const DIGIT_BY_DIFF = { 1: 3, 2: 4 };
 const clampDigits = (d) => DIGIT_BY_DIFF[d] || 3; // 기본 3자리
-const clampGuesses = (n) => Math.min(15, Math.max(5, parseInt(n, 10) || 9)); // 기본 9회
 
 const SETUP_MS = 60000; // 비밀 숫자 설정 제한(초과 시 무작위 배정)
 const TURN_MS = 45000;  // 한 턴 제한시간(초과 시 그 라운드 기회 소진)
@@ -47,7 +47,6 @@ function judge(secret, guess) {
 
 function createBaseballGame(io, room, config) {
   const digits = clampDigits(config && config.difficulty);
-  const maxGuesses = clampGuesses(config && config.rounds);
 
   // 참가자 2명 고정. order[0] 이 각 라운드 선공.
   const order = room.players.slice(0, 2).map((p) => p.id);
@@ -58,8 +57,9 @@ function createBaseballGame(io, room, config) {
   const solved = new Set(); // 이번 게임에서 홈런에 성공한 id
 
   let phase = "setup"; // setup | play | over
-  let round = 1;       // 1..maxGuesses
+  let round = 1;       // 1.. (상한 없음, 홈런까지)
   let half = 0;        // 0 = order[0] 차례, 1 = order[1] 차례
+  let realGuessesThisRound = 0; // 이번 라운드에 실제 추측이 있었는지(양쪽 다 시간초과면 종료)
   let turnEndsAt = 0;
   let timers = { setup: null, turn: null, over: null };
   let disposed = false;
@@ -76,7 +76,6 @@ function createBaseballGame(io, room, config) {
   function start() {
     io.to(room.id).emit("baseball:setup", {
       digits,
-      maxGuesses,
       players: playersPub(),
     });
     timers.setup = setTimeout(() => {
@@ -113,6 +112,7 @@ function createBaseballGame(io, room, config) {
     phase = "play";
     round = 1;
     half = 0;
+    realGuessesThisRound = 0;
     startTurn();
   }
 
@@ -120,7 +120,6 @@ function createBaseballGame(io, room, config) {
     return {
       phase,
       digits,
-      maxGuesses,
       round,
       turnId: curId(),
       turnName: nameOf(curId()),
@@ -166,6 +165,7 @@ function createBaseballGame(io, room, config) {
     const opponent = order[half === 0 ? 1 : 0];
     const res = judge(secrets.get(opponent), num);
     boards.get(socketId).push({ number: num, ...res });
+    realGuessesThisRound++;
     if (res.homerun) solved.add(socketId);
 
     if (timers.turn) { clearTimeout(timers.turn); timers.turn = null; }
@@ -190,9 +190,12 @@ function createBaseballGame(io, room, config) {
     if (aWin && bWin) return finish(null);      // 같은 라운드 동반 홈런 → 무승부
     if (aWin) return finish(a);
     if (bWin) return finish(b);
-    if (round >= maxGuesses) return finish(null); // 기회 소진, 아무도 못 맞힘 → 무승부
+    // 양쪽 다 이번 라운드에 실제 추측이 없었으면(모두 방치) 무승부로 종료
+    if (realGuessesThisRound === 0) return finish(null);
+    // 라운드 수 제한 없음 — 누군가 맞힐 때까지 계속
     round++;
     half = 0;
+    realGuessesThisRound = 0;
     startTurn();
   }
 
@@ -227,7 +230,7 @@ function createBaseballGame(io, room, config) {
     clearTimers();
   }
 
-  return { start, setSecret, guess, onPlayerLeave, dispose, digits, maxGuesses, totalRounds: maxGuesses };
+  return { start, setSecret, guess, onPlayerLeave, dispose, digits };
 }
 
-module.exports = { createBaseballGame, judge, normalizeNumber, clampDigits, clampGuesses };
+module.exports = { createBaseballGame, judge, normalizeNumber, clampDigits };
