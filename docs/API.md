@@ -114,7 +114,7 @@
 - 실패: `302 → /?social_error=1#login`
 - 네이버는 CSRF 방지용 `state` 파라미터를 검증한다(불일치 시 400).
 
-> 신규 소셜 계정은 `username = "<provider>_<providerId>"`, `nickname = 프로필 닉네임 or "<provider>유저"`로 생성된다. 이후 [닉네임 설정](#프로필)으로 실명/기본닉을 바꾸도록 유도한다.
+> 신규 소셜 계정은 `username = "<provider>_<providerId>"`, `nickname = 프로필 닉네임 or "<provider>유저"`로 생성된다.
 
 ---
 
