@@ -397,6 +397,9 @@ select.rm-input { appearance: none; cursor: pointer; }
 /* 넓은 화면: 레일을 뷰포트 왼쪽 끝에 고정 — 오른쪽 끝의 채팅과 대칭. 가운데 정렬된 .main 폭과 무관하게
    항상 화면 왼쪽 끝에 붙는다(현재 문제·게임 화면 등 메인 레이아웃과 독립). */
 @media (min-width: 1240px) {
+  /* 게임 중에는 .main의 1440px 상한을 풀어, 좌우 고정된 레일/채팅 사이 화면 폭 전체를 쓰게 한다.
+     (상한이 남아 있으면 큰 이미지가 좁아진 콘텐츠를 넘쳐 오른쪽으로 치우쳐 보였음) */
+  .main:has(.content.room-playing) { max-width: none; }
   /* 채팅이 오른쪽 316px를 차지하므로 왼쪽도 동일하게 316px 확보 → 콘텐츠(두 이미지)의 중앙이 페이지 중앙에 온다. */
   .content.room-playing { margin-left: 316px; }
   /* 레일은 폭을 고정하지 않고 내용(글자/참가자 수)에 맞춰 크기가 잡히도록 shrink-to-fit. */

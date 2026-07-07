@@ -25,7 +25,7 @@
         const data = side === "L" ? round.base : round.right;
         const cells = data.map((emo, i) =>
           `<div class="sd-cell" data-i="${i}" data-side="${side}">${escape(emo)}</div>`).join("");
-        return `<div class="sd-grid" style="grid-template-columns:repeat(${round.size},1fr)">${cells}</div>`;
+        return `<div class="sd-grid" style="grid-template-columns:repeat(${round.size},minmax(0,1fr))">${cells}</div>`;
       }
 
       // ---------- 라운드 화면 ----------
@@ -44,8 +44,8 @@
               <div class="vm-stage sd-wrap">
                 <div class="vg-caption">두 그림에서 <b>단 하나</b> 다른 칸을 먼저 찾아 클릭하세요!</div>
                 <div class="sd-boards">
-                  <div class="sd-board"><div class="cap">원본</div>${boardHtml("L")}</div>
-                  <div class="sd-board"><div class="cap">바뀐 그림</div>${boardHtml("R")}</div>
+                  <div class="sd-board">${boardHtml("L")}</div>
+                  <div class="sd-board">${boardHtml("R")}</div>
                 </div>
                 <div class="vg-result" id="sm-result"></div>
               </div>
