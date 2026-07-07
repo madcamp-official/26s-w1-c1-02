@@ -59,6 +59,22 @@
 
       const stop = () => { clearInterval(timer); timer = null; };
 
+      // 서버에 저장된 진행도가 로컬(이 브라우저)보다 앞서 있으면 반영 — 다른 기기/브라우저 대비.
+      // reportLevelClear는 로컬→서버로만 올리므로, 이 함수 없이는 새 브라우저에서 항상 레벨 1부터 시작하게 된다.
+      async function syncFromServer() {
+        const token = localStorage.getItem("mgh.token");
+        if (!token) return;
+        try {
+          const r = await fetch("/api/games/jamo/progress", { headers: { Authorization: `Bearer ${token}` } });
+          if (!r.ok) return;
+          const data = await r.json();
+          if (typeof data.level === "number" && data.level > getCleared()) {
+            setCleared(data.level);
+            if (ended) showLevelSelect(); // 아직 레벨 선택 화면이면 갱신, 플레이 중이면 다음 방문 때 반영
+          }
+        } catch (e) { /* 네트워크 오류 시 로컬 값 유지 */ }
+      }
+
       // ================= 레벨 선택 =================
       function showLevelSelect() {
         stop(); ended = true;
@@ -245,6 +261,7 @@
       function showResult(html) { const b = container.querySelector("#vg-result"); if (b) b.innerHTML = html; }
 
       showLevelSelect();
+      syncFromServer();
       return () => stop();
     },
   };

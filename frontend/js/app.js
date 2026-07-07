@@ -33,12 +33,6 @@
       desc: "흩어진 자음·모음을 모두 조합해 실제 단어를 만드세요.", lv: 1, done: 0, total: 20, playable: true },
     { id: "spot", icon: "🔍", title: "다른 그림 찾기", badge: null,
       desc: "두 그림에서 서로 다른 부분을 제한 시간 안에 찾아보세요.", lv: 1, done: 0, total: 20, playable: true },
-    { id: "word", icon: "🔤", title: "끝말잇기 연습", badge: null,
-      desc: "AI와 함께 끝말잇기 연습. 난이도를 선택할 수 있어요.", lv: 7, done: 6, total: 15 },
-    { id: "speed", icon: "⚡", title: "스피드 타자", badge: null,
-      desc: "제한 시간 내에 얼마나 빠르게 단어를 입력할 수 있나요?", lv: 3, done: 2, total: 12 },
-    { id: "quiz", icon: "🧠", title: "상식 퀴즈", badge: null,
-      desc: "다양한 주제의 상식 문제로 두뇌를 깨워보세요.", lv: 5, done: 4, total: 18 },
   ];
 
   function modeLabel(id) {
@@ -407,31 +401,50 @@
     return [content, null];
   }
 
-  // 로그인 상태면 자모(자음 모음 조합) 실제 레벨/진행도를 가져와 SOLO_GAMES에 반영
-  async function refreshVowelProgress() {
+  // 로그인 상태면 레벨제 솔로 게임들의 실제 레벨/진행도를 가져와 SOLO_GAMES에 반영.
+  // apiPath/maxLevel/lsKey는 각 게임 클라이언트(vowel-game.js/spot-difference.js)의 값과 동일해야 함.
+  const PROGRESS_GAMES = [
+    { id: "vowel", apiPath: "jamo", maxLevel: 20, lsKey: "mgh.vowel.cleared" },
+    { id: "spot", apiPath: "spot", maxLevel: 20, lsKey: "mgh.spot.cleared" },
+  ];
+  async function refreshSoloProgress() {
     const token = localStorage.getItem("mgh.token");
     if (!token) return;
-    try {
-      const res = await fetch("/api/games/jamo/progress", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const g = SOLO_GAMES.find((x) => x.id === "vowel");
-      if (!g) return;
-      const VOWEL_MAX_LEVEL = 20; // vowel-game.js의 MAX_LEVEL과 동일해야 함
-      const changed = g.lv !== data.level || g.done !== data.level || g.total !== VOWEL_MAX_LEVEL;
-      g.lv = data.level;
-      g.done = data.level;
-      g.total = VOWEL_MAX_LEVEL;
-      if (changed && state.view === "solo") render();
-    } catch (e) {
-      // 네트워크 오류 시 기존 표시값 유지
-    }
+    let changed = false;
+    await Promise.all(PROGRESS_GAMES.map(async ({ id, apiPath, maxLevel, lsKey }) => {
+      try {
+        // 이 브라우저에 이미 기록된 로컬 클리어 레벨을 서버에도 반영.
+        // 각 게임 화면(vowel-game.js/spot-difference.js)의 레벨 선택 화면을 열어야만
+        // 서버로 올라가므로, 로그인 후 홈 화면만 본 경우엔 아직 반영 안 됐을 수 있음.
+        const local = Math.min(maxLevel, Math.max(0, parseInt(localStorage.getItem(lsKey), 10) || 0));
+        if (local > 0) {
+          await fetch(`/api/games/${apiPath}/level-clear`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ level: local }),
+          }).catch(() => {});
+        }
+
+        const res = await fetch(`/api/games/${apiPath}/progress`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const g = SOLO_GAMES.find((x) => x.id === id);
+        if (!g) return;
+        if (g.lv !== data.level || g.done !== data.level || g.total !== maxLevel) changed = true;
+        g.lv = data.level;
+        g.done = data.level;
+        g.total = maxLevel;
+      } catch (e) {
+        // 네트워크 오류 시 기존 표시값 유지
+      }
+    }));
+    if (changed && state.view === "solo") render();
   }
 
   function soloView() {
-    refreshVowelProgress();
+    refreshSoloProgress();
     const items = SOLO_GAMES.map((g) => {
       const pct = Math.round((g.done / g.total) * 100);
       const badge = g.badge ? `<span class="badge ${g.badge.c}">${g.badge.t}</span>` : "";
@@ -561,7 +574,7 @@
     const vowelCfg = o.querySelector("#rc-vowel-cfg");
     const roundsSlider = o.querySelector("#rc-rounds"), roundsVal = o.querySelector("#rc-rounds-val");
     roundsSlider.addEventListener("input", () => { roundsVal.textContent = roundsSlider.value; });
-    const syncVowelCfg = () => { vowelCfg.hidden = modeSel.value !== "vowel"; };
+    const syncVowelCfg = () => { vowelCfg.hidden = modeSel.value !== "vowel" && modeSel.value !== "spot"; };
     modeSel.addEventListener("change", syncVowelCfg);
     syncVowelCfg();
 
@@ -692,13 +705,13 @@
           <div class="page-sub" id="mp-count">방 ${net.rooms.length}개</div>
         </div>
         <div class="mp-toolbar">
-          <div class="mp-search"><input placeholder="방 검색 (준비 중)..." disabled /></div>
+          <div class="mp-search"><input id="room-search" placeholder="방 검색..." /></div>
           <button class="btn primary" id="mk-room">＋ 방 생성</button>
           <button class="btn" id="join-room">→ 방 참가</button>
         </div>
         <div class="rooms">
           <table>
-            <thead><tr><th>#</th><th>방 이름</th><th>방장</th><th>모드</th><th>인원</th><th>상태</th></tr></thead>
+            <thead><tr><th>방 이름</th><th>방장</th><th>모드</th><th>인원</th><th>상태</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -706,20 +719,23 @@
 
     const tbody = content.querySelector("tbody");
     const count = content.querySelector("#mp-count");
+    const search = content.querySelector("#room-search");
 
     function paint() {
-      count.textContent = `방 ${net.rooms.length}개`;
-      tbody.innerHTML = net.rooms.length
-        ? net.rooms.map((r, i) => `
+      const q = search.value.trim().toLowerCase();
+      const rooms = q ? net.rooms.filter((r) => r.name.toLowerCase().includes(q)) : net.rooms;
+
+      count.textContent = q ? `방 ${rooms.length}개 (전체 ${net.rooms.length}개)` : `방 ${net.rooms.length}개`;
+      tbody.innerHTML = rooms.length
+        ? rooms.map((r) => `
           <tr data-room="${r.id}">
-            <td>${i + 1}</td>
             <td><div class="room-name">${r.locked ? "🔒 " : ""}${escape(r.name)}</div></td>
             <td class="host">☆ ${escape(r.hostName)}</td>
             <td>${escape(modeLabel(r.mode))}</td>
             <td>${r.cur}/${r.max}</td>
             <td><span class="state ${r.state === "wait" ? "wait" : "play"}">${r.state === "wait" ? "대기중" : "게임중"}</span></td>
           </tr>`).join("")
-        : `<tr><td colspan="6" class="rooms-empty">아직 생성된 방이 없어요. 방을 만들어보세요!</td></tr>`;
+        : `<tr><td colspan="5" class="rooms-empty">${q ? "검색 결과가 없어요." : "아직 생성된 방이 없어요. 방을 만들어보세요!"}</td></tr>`;
 
       tbody.querySelectorAll("tr[data-room]").forEach((tr) => tr.addEventListener("click", async () => {
         const room = net.rooms.find((r) => r.id === tr.dataset.room);
@@ -734,6 +750,7 @@
 
     content.querySelector("#mk-room").addEventListener("click", openCreateRoom);
     content.querySelector("#join-room").addEventListener("click", openJoinByCode);
+    search.addEventListener("input", paint);
 
     const listener = () => paint();
     net.listeners.add(listener);
@@ -757,6 +774,9 @@
     const count = el.querySelector("#room-chat-count");
     const input = el.querySelector("#room-chat-input");
     function paint() {
+      const room = net.room;
+      const inGame = !!(room && room.state === "play" && (room.mode === "vowel" || room.mode === "spot"));
+      el.classList.toggle("in-game", inGame);
       count.textContent = `${net.room ? net.room.players.length : 0}명`;
       scroll.innerHTML = net.roomChat.map((m) =>
         m.sys
@@ -785,20 +805,23 @@
     const root = content.querySelector("#room-root");
     let gearOpen = false;
 
-    // 멀티 게임 마운트 상태 (자음·모음 조합 실시간 대전)
+    // 멀티 게임 마운트 상태 (자음·모음 조합 / 다른 그림 찾기 실시간 대전)
     let gameCleanup = null, gameMounted = false, gameFinished = false;
-    function mountGame() {
+    function mountGame(mode) {
       root.innerHTML = "";
       gameMounted = true; gameFinished = false;
-      gameCleanup = window.VowelMulti.mount(root, {
+      const engine = mode === "spot" ? window.SpotMulti : window.VowelMulti;
+      gameCleanup = engine.mount(root, {
         socket: net.socket,
         onExit: exitGame,
         onFinish: () => { gameFinished = true; },
       });
+      content.classList.add("room-playing");
     }
     function unmountGame() {
       if (gameCleanup) { gameCleanup(); gameCleanup = null; }
       gameMounted = false; gameFinished = false;
+      content.classList.remove("room-playing");
     }
     function exitGame() { unmountGame(); paint(); }
 
@@ -820,9 +843,9 @@
       const room = net.room;
       if (!room) { unmountGame(); go("multi"); return; }
 
-      // 자음·모음 조합 게임 진행 중 → 게임 화면을 마운트하고 이후 재렌더는 게임이 자체 관리
-      if (room.state === "play" && room.mode === "vowel") {
-        if (!gameMounted) mountGame();
+      // 실시간 게임 진행 중 → 게임 화면을 마운트하고 이후 재렌더는 게임이 자체 관리
+      if (room.state === "play" && (room.mode === "vowel" || room.mode === "spot")) {
+        if (!gameMounted) mountGame(room.mode);
         return;
       }
       // 대기 상태로 돌아왔는데 게임이 아직 붙어 있으면:
@@ -835,7 +858,8 @@
 
       const isHost = !!(net.socket && room.hostId === net.socket.id);
       const meId = net.socket && net.socket.id;
-      const isVowel = room.mode === "vowel";
+      // 난이도·문제 수 설정을 쓰는 게임(자음·모음 조합 / 다른 그림 찾기)
+      const isVowel = room.mode === "vowel" || room.mode === "spot";
       const modeOptions = (net.modes.length ? net.modes : [{ id: room.mode, label: modeLabel(room.mode) }])
         .map((m) => `<option value="${m.id}"${m.id === room.mode ? " selected" : ""}>${escape(m.label)}</option>`).join("");
       // 시작 게이트: 방장 제외 전원 준비 + (2명 이상)

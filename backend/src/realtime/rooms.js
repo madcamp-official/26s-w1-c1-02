@@ -1,6 +1,10 @@
 // 멀티플레이 로비: 방 생성/참가/비밀방/방장 모드 변경 (in-memory, DB 미사용 — 휘발성 상태)
 const { Server } = require("socket.io");
 const { createVowelGame, clampDiff, clampRounds } = require("./games/vowel");
+const { createSpotGame } = require("./games/spot");
+
+// 실시간 게임 엔진을 구동하는 모드(그 외 모드는 상태 토글만)
+const ENGINE_MODES = new Set(["vowel", "spot"]);
 
 const MODES = [
   { id: "spot", label: "다른그림찾기" },
@@ -236,7 +240,7 @@ function attachRealtime(server) {
           socket.emit("room:notice", "아직 준비하지 않은 참가자가 있습니다.");
           return;
         }
-        if (room.mode === "vowel" && room.players.length < 2) {
+        if (ENGINE_MODES.has(room.mode) && room.players.length < 2) {
           socket.emit("room:notice", "2명 이상이 있어야 시작할 수 있습니다.");
           return;
         }
@@ -244,10 +248,13 @@ function attachRealtime(server) {
         roomSystemMessage(room, "게임이 시작되었습니다.");
         broadcastRoomState(room);
         broadcastRoomList();
-        // 자음·모음 조합 모드는 실시간 게임 엔진 구동 (그 외 모드는 상태 토글만)
-        if (room.mode === "vowel") {
+        // 실시간 게임 엔진 구동 (그 외 모드는 상태 토글만)
+        if (ENGINE_MODES.has(room.mode)) {
+          const opts = { difficulty: room.difficulty, rounds: room.rounds };
           room.onGameEnd = () => endGame(room);
-          room.game = createVowelGame(io, room, { difficulty: room.difficulty, rounds: room.rounds });
+          room.game = room.mode === "spot"
+            ? createSpotGame(io, room, opts)
+            : createVowelGame(io, room, opts);
           room.game.start();
         }
       } else {
@@ -261,6 +268,13 @@ function attachRealtime(server) {
       const room = rooms.get(socket.data.roomId);
       if (!room || !room.game) return;
       room.game.submit(socket.id, payload && payload.word);
+    });
+
+    // 다른 그림 찾기 멀티플레이: 다른 칸 클릭 제출
+    socket.on("spot:submit", (payload) => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || !room.game) return;
+      room.game.submit(socket.id, payload && payload.cell);
     });
 
     socket.on("room:chat", (text) => {

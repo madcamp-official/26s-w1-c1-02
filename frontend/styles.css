@@ -79,6 +79,12 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- Main / layout with sidebar ---------- */
 .main { flex: 1; display: flex; gap: 16px; padding: 18px 20px; max-width: 1440px; width: 100%; margin: 0 auto; }
+/* 멀티플레이 게임 진행 중: 채팅 사이드바를 뷰포트 오른쪽 끝에 고정(가운데 정렬된 .main 폭과 무관하게 항상 화면 끝에 붙음) */
+.content.room-playing { margin-right: 316px; }
+.sidebar.in-game {
+  position: fixed; right: 16px; top: calc(var(--nav-h) + 18px);
+  height: calc(100dvh - var(--nav-h) - 36px);
+}
 .content { flex: 1; min-width: 0; }
 .sidebar {
   width: 300px; flex: none; background: var(--surface); border: 1px solid var(--border);
@@ -364,8 +370,6 @@ select.rm-input { appearance: none; cursor: pointer; }
 .vm-score-row:first-of-type { border-top: none; }
 .vm-score-row.pending { opacity: .55; }
 .vm-rank { width: 24px; text-align: center; flex-shrink: 0; }
-.vm-status { width: 16px; text-align: center; flex-shrink: 0; color: var(--ok); font-weight: 800; }
-.vm-score-row.pending .vm-status { color: var(--muted); }
 .vm-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vm-pts { font-weight: 800; color: var(--accent); text-align: right; }
 .vm-modal { max-width: 420px; }

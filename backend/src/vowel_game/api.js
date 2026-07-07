@@ -2,8 +2,10 @@
 const express = require("express");
 const { pool } = require("../db");
 const puzzle = require("./puzzle");
+const { createProgressRouter } = require("../progress/api");
 
 const router = express.Router();
+router.use(createProgressRouter("jamo")); // /level-clear, /progress (공용 레벨 진행도 API)
 
 // 난이도 → 음절 수 범위
 const DIFF = { 1: [2, 2], 2: [2, 3], 3: [3, 4] };
@@ -82,42 +84,6 @@ router.post("/submit", async (req, res) => {
     res.json({ correct, score, matched: correct ? word : null, reason });
   } catch (e) {
     console.error("jamo/submit error:", e);
-    res.status(500).json({ error: "server_error" });
-  }
-});
-
-// POST /api/games/jamo/level-clear  { level }  → 프론트 20단계 레벨제에서 실제 클리어한 레벨 반영
-router.post("/level-clear", async (req, res) => {
-  if (!req.userId) return res.status(401).json({ error: "login_required" });
-  const level = parseInt(req.body && req.body.level, 10);
-  if (!level || level < 1) return res.status(400).json({ error: "bad_request" });
-  try {
-    await pool.query(
-      `INSERT INTO user_game_progress (user_id, game, level, exp, cleared_count, best_score, updated_at)
-       VALUES ($1, 'jamo', $2, 0, 0, 0, now())
-       ON CONFLICT (user_id, game) DO UPDATE SET
-         level      = GREATEST(user_game_progress.level, $2),
-         updated_at = now()`,
-      [req.userId, level]
-    );
-    res.json({ ok: true });
-  } catch (e) {
-    console.error("jamo/level-clear error:", e);
-    res.status(500).json({ error: "server_error" });
-  }
-});
-
-// GET /api/games/jamo/progress  → 로그인한 유저의 현재 레벨/클리어 수
-router.get("/progress", async (req, res) => {
-  if (!req.userId) return res.status(401).json({ error: "login_required" });
-  try {
-    const { rows } = await pool.query(
-      `SELECT level, cleared_count FROM user_game_progress WHERE user_id = $1 AND game = 'jamo'`,
-      [req.userId]
-    );
-    res.json(rows[0] || { level: 1, cleared_count: 0 });
-  } catch (e) {
-    console.error("jamo/progress error:", e);
     res.status(500).json({ error: "server_error" });
   }
 });
