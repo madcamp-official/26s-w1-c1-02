@@ -62,15 +62,4 @@ function jamoKey(word) {
   return decompose(word).sort().join("");
 }
 
-// 자모 배열 두 개가 같은 멀티셋인지 (문제 자모 == 단어 자모)
-function sameJamoSet(a, b) {
-  if (a.length !== b.length) return false;
-  return [...a].sort().join("") === [...b].sort().join("");
-}
-
-// 초/중/종 인덱스로 음절 하나 조합
-function composeSyllable(cho, jung, jong = 0) {
-  return String.fromCodePoint(BASE + (cho * N_JUNG + jung) * N_JONG + jong);
-}
-
-module.exports = { decompose, jamoKey, sameJamoSet, composeSyllable, CHO, JUNG, JONG, isSyllable };
+module.exports = { decompose, jamoKey, CHO, JUNG, JONG };
