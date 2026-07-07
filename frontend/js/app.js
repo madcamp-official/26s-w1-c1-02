@@ -533,7 +533,7 @@
     const vowelCfg = o.querySelector("#rc-vowel-cfg");
     const roundsSlider = o.querySelector("#rc-rounds"), roundsVal = o.querySelector("#rc-rounds-val");
     roundsSlider.addEventListener("input", () => { roundsVal.textContent = roundsSlider.value; });
-    const syncVowelCfg = () => { vowelCfg.hidden = modeSel.value !== "vowel"; };
+    const syncVowelCfg = () => { vowelCfg.hidden = modeSel.value !== "vowel" && modeSel.value !== "spot"; };
     modeSel.addEventListener("change", syncVowelCfg);
     syncVowelCfg();
 
@@ -757,12 +757,13 @@
     const root = content.querySelector("#room-root");
     let gearOpen = false;
 
-    // 멀티 게임 마운트 상태 (자음·모음 조합 실시간 대전)
+    // 멀티 게임 마운트 상태 (자음·모음 조합 / 다른 그림 찾기 실시간 대전)
     let gameCleanup = null, gameMounted = false, gameFinished = false;
-    function mountGame() {
+    function mountGame(mode) {
       root.innerHTML = "";
       gameMounted = true; gameFinished = false;
-      gameCleanup = window.VowelMulti.mount(root, {
+      const engine = mode === "spot" ? window.SpotMulti : window.VowelMulti;
+      gameCleanup = engine.mount(root, {
         socket: net.socket,
         onExit: exitGame,
         onFinish: () => { gameFinished = true; },
@@ -792,9 +793,9 @@
       const room = net.room;
       if (!room) { unmountGame(); go("multi"); return; }
 
-      // 자음·모음 조합 게임 진행 중 → 게임 화면을 마운트하고 이후 재렌더는 게임이 자체 관리
-      if (room.state === "play" && room.mode === "vowel") {
-        if (!gameMounted) mountGame();
+      // 실시간 게임 진행 중 → 게임 화면을 마운트하고 이후 재렌더는 게임이 자체 관리
+      if (room.state === "play" && (room.mode === "vowel" || room.mode === "spot")) {
+        if (!gameMounted) mountGame(room.mode);
         return;
       }
       // 대기 상태로 돌아왔는데 게임이 아직 붙어 있으면:
@@ -807,7 +808,8 @@
 
       const isHost = !!(net.socket && room.hostId === net.socket.id);
       const meId = net.socket && net.socket.id;
-      const isVowel = room.mode === "vowel";
+      // 난이도·문제 수 설정을 쓰는 게임(자음·모음 조합 / 다른 그림 찾기)
+      const isVowel = room.mode === "vowel" || room.mode === "spot";
       const modeOptions = (net.modes.length ? net.modes : [{ id: room.mode, label: modeLabel(room.mode) }])
         .map((m) => `<option value="${m.id}"${m.id === room.mode ? " selected" : ""}>${escape(m.label)}</option>`).join("");
       // 시작 게이트: 방장 제외 전원 준비 + (2명 이상)
