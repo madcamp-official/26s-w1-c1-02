@@ -2,13 +2,17 @@
 const { Server } = require("socket.io");
 const { createVowelGame, clampDiff, clampRounds } = require("./games/vowel");
 const { createSpotGame } = require("./games/spot");
+const { createBaseballGame } = require("./games/baseball");
 
 // 실시간 게임 엔진을 구동하는 모드(그 외 모드는 상태 토글만)
-const ENGINE_MODES = new Set(["vowel", "spot"]);
+const ENGINE_MODES = new Set(["vowel", "spot", "baseball"]);
+// 1대1 전용 모드 — 방 인원을 2명으로 고정한다.
+const DUEL_MODES = new Set(["baseball"]);
 
 const MODES = [
   { id: "spot", label: "다른그림찾기" },
   { id: "vowel", label: "자음 모음 조합하기" },
+  { id: "baseball", label: "숫자야구" },
 ];
 const MODE_IDS = new Set(MODES.map((m) => m.id));
 const DEFAULT_MODE = MODES[0].id;
@@ -141,7 +145,9 @@ function attachRealtime(server) {
       if (!name) return cb({ ok: false, message: "방 이름을 입력해주세요." });
 
       const mode = MODE_IDS.has(payload && payload.mode) ? payload.mode : DEFAULT_MODE;
-      const maxPlayers = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, parseInt(payload && payload.maxPlayers, 10) || 6));
+      const maxPlayers = DUEL_MODES.has(mode)
+        ? 2 // 1대1 전용 모드는 항상 2명 고정
+        : Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, parseInt(payload && payload.maxPlayers, 10) || 6));
       const isPrivate = !!(payload && payload.private);
       const password = isPrivate ? sanitize(payload && payload.password, 32) : "";
       if (isPrivate && !password) return cb({ ok: false, message: "비밀방은 비밀번호를 입력해주세요." });
@@ -205,6 +211,8 @@ function attachRealtime(server) {
       const room = rooms.get(socket.data.roomId);
       if (!room || room.hostId !== socket.id || !MODE_IDS.has(mode)) return;
       room.mode = mode;
+      // 1대1 전용 모드로 바꾸면 정원을 2명으로 고정(추가 입장 차단), 아니면 기존 인원 유지
+      if (DUEL_MODES.has(mode)) room.maxPlayers = 2;
       const label = MODES.find((m) => m.id === mode).label;
       roomSystemMessage(room, `방장이 게임 모드를 "${label}"(으)로 변경했습니다.`);
       broadcastRoomState(room);
@@ -240,6 +248,10 @@ function attachRealtime(server) {
           socket.emit("room:notice", "아직 준비하지 않은 참가자가 있습니다.");
           return;
         }
+        if (DUEL_MODES.has(room.mode) && room.players.length !== 2) {
+          socket.emit("room:notice", "이 게임은 정확히 2명이 있어야 시작할 수 있습니다.");
+          return;
+        }
         if (ENGINE_MODES.has(room.mode) && room.players.length < 2) {
           socket.emit("room:notice", "2명 이상이 있어야 시작할 수 있습니다.");
           return;
@@ -254,7 +266,9 @@ function attachRealtime(server) {
           room.onGameEnd = () => endGame(room);
           room.game = room.mode === "spot"
             ? createSpotGame(io, room, opts)
-            : createVowelGame(io, room, opts);
+            : room.mode === "baseball"
+              ? createBaseballGame(io, room, opts)
+              : createVowelGame(io, room, opts);
           room.game.start();
         }
       } else {
@@ -275,6 +289,18 @@ function attachRealtime(server) {
       const room = rooms.get(socket.data.roomId);
       if (!room || !room.game) return;
       room.game.submit(socket.id, payload && payload.cell);
+    });
+
+    // 숫자야구 멀티플레이: 비밀 숫자 설정 / 추측
+    socket.on("baseball:secret", (payload) => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || !room.game || typeof room.game.setSecret !== "function") return;
+      room.game.setSecret(socket.id, payload && payload.number);
+    });
+    socket.on("baseball:guess", (payload) => {
+      const room = rooms.get(socket.data.roomId);
+      if (!room || !room.game || typeof room.game.guess !== "function") return;
+      room.game.guess(socket.id, payload && payload.number);
     });
 
     socket.on("room:chat", (text) => {

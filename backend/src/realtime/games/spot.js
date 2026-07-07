@@ -15,7 +15,7 @@ const SPOT_DIFF = {
   1: { label: "쉬움",     size: 5,  time: 22 },
   2: { label: "보통",     size: 7,  time: 26 },
   3: { label: "어려움",   size: 9,  time: 32 },
-  4: { label: "세종대왕", size: 11, time: 38 },
+  4: { label: "인간프린터", size: 11, time: 38 },
 };
 const REVEAL_MS = 4000;        // 정답 공개 후 다음 라운드까지 대기
 const WRONG_COOLDOWN_MS = 2000; // 오답 후 재클릭 잠금(연타 방지)

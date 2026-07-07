@@ -31,6 +31,7 @@ cp "$FRONTEND/js/spot-difference.js" "$WEB_ROOT/js/spot-difference.js"
 cp "$FRONTEND/js/vowel-game.js"      "$WEB_ROOT/js/vowel-game.js"
 cp "$FRONTEND/js/vowel-multi.js"     "$WEB_ROOT/js/vowel-multi.js"
 cp "$FRONTEND/js/spot-multi.js"      "$WEB_ROOT/js/spot-multi.js"
+cp "$FRONTEND/js/baseball-multi.js"  "$WEB_ROOT/js/baseball-multi.js"
 
 echo "▶ nginx 설정 동기화 & reload (빌드 ID=$BUILD_ID 주입)"
 # 빌드 ID는 웹 루트 밖의 nginx 설정에만 존재 → 프론트 파일이 되돌려져도 영향 없음.
