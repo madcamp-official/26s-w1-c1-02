@@ -15,9 +15,12 @@
 
   // ---------- 레벨 설정 (조정 쉬움) ----------
   const MAX_LEVEL = 20;
+  // 진행도(깬 레벨)의 단일 출처는 서버 DB(user_game_progress). 로그인 상태면 localStorage는 진행도에 관여하지 않는다.
+  // 비로그인(손님)은 DB 행이 없으므로 이 브라우저에만 임시 저장한다.
   const LS_KEY = "mgh.spot.cleared";
-  const getCleared = () => Math.min(MAX_LEVEL, Math.max(0, parseInt(localStorage.getItem(LS_KEY), 10) || 0));
-  const setCleared = (n) => localStorage.setItem(LS_KEY, String(Math.min(MAX_LEVEL, n)));
+  const isLoggedIn = () => !!localStorage.getItem("mgh.token");
+  const getGuestCleared = () => Math.min(MAX_LEVEL, Math.max(0, parseInt(localStorage.getItem(LS_KEY), 10) || 0));
+  const setGuestCleared = (n) => localStorage.setItem(LS_KEY, String(Math.min(MAX_LEVEL, n)));
 
   // 3레벨마다 격자를 한 단계 키운다(4×4→10×10). 같은 크기 구간에서는 레벨마다 제한 시간이 줄고,
   // 격자가 커질수록 기본 시간과 오답 페널티가 함께 커진다. 그래서 난이도는 레벨마다 단조 증가.
@@ -48,6 +51,8 @@
 
       let timer = null;
       let level = 1, cfg = null, round = null, seconds = 0, misses = 0, ended = true;
+      // 화면 표시용 진행도. 로그인 유저는 서버 DB에서 채운다. 손님은 이 브라우저 저장값으로 시작.
+      let cleared = isLoggedIn() ? 0 : getGuestCleared();
 
       const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
       const $ = (sel) => container.querySelector(sel);
@@ -63,7 +68,8 @@
         }).catch(() => {});
       }
 
-      // 서버에 저장된 진행도가 로컬(이 브라우저)보다 앞서 있으면 반영 — 다른 기기/브라우저 대비.
+      // 로그인 유저의 진행도는 서버 DB가 유일한 출처. 표시값(cleared)을 서버 값으로 그대로 덮어쓴다
+      // (로컬 캐시가 더 높아도 서버 값으로 맞춘다 — 다른 기기/브라우저 간 일관성 보장).
       async function syncFromServer() {
         const token = localStorage.getItem("mgh.token");
         if (!token) return;
@@ -71,18 +77,17 @@
           const r = await fetch("/api/games/spot/progress", { headers: { Authorization: `Bearer ${token}` } });
           if (!r.ok) return;
           const data = await r.json();
-          if (typeof data.level === "number" && data.level > getCleared()) {
-            setCleared(data.level);
-            if (ended) showLevelSelect(); // 아직 레벨 선택 화면이면 갱신, 플레이 중이면 다음 방문 때 반영
+          if (typeof data.level === "number") {
+            cleared = Math.min(MAX_LEVEL, Math.max(0, data.level));
+            if (ended) showLevelSelect(); // 레벨 선택 화면이면 갱신, 플레이 중이면 다음 방문 때 반영
           }
-        } catch (e) { /* 네트워크 오류 시 로컬 값 유지 */ }
+        } catch (e) { /* 네트워크 오류 시 기존 표시값 유지 */ }
       }
 
       // ================= 레벨 선택 =================
       function showLevelSelect() {
         stop(); ended = true; round = null;
-        const cleared = getCleared();
-        if (cleared > 0) reportLevelClear(cleared);
+        // 표시는 현재 진행도 상태(cleared)만 사용. 로컬 값을 서버로 밀어올리지 않는다.
         let cells = "";
         for (let n = 1; n <= MAX_LEVEL; n++) {
           const st = n <= cleared ? "cleared" : n === cleared + 1 ? "current" : "locked";
@@ -163,9 +168,10 @@
       function levelClear() {
         ended = true; stop();
         const used = cfg.seconds - seconds;
-        const wasNewUnlock = level > getCleared() && level < MAX_LEVEL;
-        setCleared(Math.max(getCleared(), level));
-        reportLevelClear(level);
+        const wasNewUnlock = level > cleared && level < MAX_LEVEL;
+        cleared = Math.max(cleared, level);
+        if (isLoggedIn()) reportLevelClear(level);  // 로그인: 서버 DB에 기록(단일 출처)
+        else setGuestCleared(cleared);              // 손님: 이 브라우저에만 임시 저장
         overlay(`
           <div class="big">🎉</div>
           <h2>레벨 ${level} 클리어!</h2>

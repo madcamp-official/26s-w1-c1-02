@@ -40,9 +40,12 @@
 
   // ---------- 레벨 설정 (조정 쉬움) ----------
   const MAX_LEVEL = 20;
+  // 진행도(깬 레벨)의 단일 출처는 서버 DB(user_game_progress). 로그인 상태면 localStorage는 진행도에 관여하지 않는다.
+  // 비로그인(손님)은 DB 행이 없으므로 이 브라우저에만 임시 저장한다.
   const LS_KEY = "mgh.vowel.cleared";
-  const getCleared = () => Math.min(MAX_LEVEL, Math.max(0, parseInt(localStorage.getItem(LS_KEY), 10) || 0));
-  const setCleared = (n) => localStorage.setItem(LS_KEY, String(Math.min(MAX_LEVEL, n)));
+  const isLoggedIn = () => !!localStorage.getItem("mgh.token");
+  const getGuestCleared = () => Math.min(MAX_LEVEL, Math.max(0, parseInt(localStorage.getItem(LS_KEY), 10) || 0));
+  const setGuestCleared = (n) => localStorage.setItem(LS_KEY, String(Math.min(MAX_LEVEL, n)));
 
   function levelConfig(n) {
     const difficulty = n <= 7 ? 1 : n <= 14 ? 2 : 3; // 음절 수: 2 / 2~3 / 3~4
@@ -56,11 +59,13 @@
     mount(container, opts = {}) {
       let timer = null;
       let level = 1, cfg = null, remain = 0, solved = 0, ended = true, puzzle = null;
+      // 화면 표시용 진행도. 로그인 유저는 서버 DB에서 채운다. 손님은 이 브라우저 저장값으로 시작.
+      let cleared = isLoggedIn() ? 0 : getGuestCleared();
 
       const stop = () => { clearInterval(timer); timer = null; };
 
-      // 서버에 저장된 진행도가 로컬(이 브라우저)보다 앞서 있으면 반영 — 다른 기기/브라우저 대비.
-      // reportLevelClear는 로컬→서버로만 올리므로, 이 함수 없이는 새 브라우저에서 항상 레벨 1부터 시작하게 된다.
+      // 로그인 유저의 진행도는 서버 DB가 유일한 출처. 표시값(cleared)을 서버 값으로 그대로 덮어쓴다
+      // (로컬 캐시가 더 높아도 서버 값으로 맞춘다 — 다른 기기/브라우저 간 일관성 보장).
       async function syncFromServer() {
         const token = localStorage.getItem("mgh.token");
         if (!token) return;
@@ -68,18 +73,17 @@
           const r = await fetch("/api/games/jamo/progress", { headers: { Authorization: `Bearer ${token}` } });
           if (!r.ok) return;
           const data = await r.json();
-          if (typeof data.level === "number" && data.level > getCleared()) {
-            setCleared(data.level);
-            if (ended) showLevelSelect(); // 아직 레벨 선택 화면이면 갱신, 플레이 중이면 다음 방문 때 반영
+          if (typeof data.level === "number") {
+            cleared = Math.min(MAX_LEVEL, Math.max(0, data.level));
+            if (ended) showLevelSelect(); // 레벨 선택 화면이면 갱신, 플레이 중이면 다음 방문 때 반영
           }
-        } catch (e) { /* 네트워크 오류 시 로컬 값 유지 */ }
+        } catch (e) { /* 네트워크 오류 시 기존 표시값 유지 */ }
       }
 
       // ================= 레벨 선택 =================
       function showLevelSelect() {
         stop(); ended = true;
-        const cleared = getCleared();
-        if (cleared > 0) reportLevelClear(cleared);
+        // 표시는 현재 진행도 상태(cleared)만 사용. 로컬 값을 서버로 밀어올리지 않는다.
         let cells = "";
         for (let n = 1; n <= MAX_LEVEL; n++) {
           const st = n <= cleared ? "cleared" : n === cleared + 1 ? "current" : "locked";
@@ -218,9 +222,10 @@
 
       function levelClear() {
         ended = true; stop();
-        const wasNewUnlock = level > getCleared() && level < MAX_LEVEL;
-        setCleared(Math.max(getCleared(), level));
-        reportLevelClear(level);
+        const wasNewUnlock = level > cleared && level < MAX_LEVEL;
+        cleared = Math.max(cleared, level);
+        if (isLoggedIn()) reportLevelClear(level);  // 로그인: 서버 DB에 기록(단일 출처)
+        else setGuestCleared(cleared);              // 손님: 이 브라우저에만 임시 저장
         overlay(`
           <div class="big">🏆</div>
           <h2>레벨 ${level} 클리어!</h2>
