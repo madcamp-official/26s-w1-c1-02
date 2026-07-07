@@ -770,6 +770,9 @@
     const count = el.querySelector("#room-chat-count");
     const input = el.querySelector("#room-chat-input");
     function paint() {
+      const room = net.room;
+      const inGame = !!(room && room.state === "play" && (room.mode === "vowel" || room.mode === "spot"));
+      el.classList.toggle("in-game", inGame);
       count.textContent = `${net.room ? net.room.players.length : 0}명`;
       scroll.innerHTML = net.roomChat.map((m) =>
         m.sys
@@ -809,12 +812,12 @@
         onExit: exitGame,
         onFinish: () => { gameFinished = true; },
       });
-      root.closest(".main")?.classList.add("room-playing");
+      content.classList.add("room-playing");
     }
     function unmountGame() {
       if (gameCleanup) { gameCleanup(); gameCleanup = null; }
       gameMounted = false; gameFinished = false;
-      root.closest(".main")?.classList.remove("room-playing");
+      content.classList.remove("room-playing");
     }
     function exitGame() { unmountGame(); paint(); }
 

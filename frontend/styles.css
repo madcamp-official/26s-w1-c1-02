@@ -79,8 +79,12 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------- Main / layout with sidebar ---------- */
 .main { flex: 1; display: flex; gap: 16px; padding: 18px 20px; max-width: 1440px; width: 100%; margin: 0 auto; }
-/* 멀티플레이 게임 진행 중: 채팅 사이드바가 화면 오른쪽 끝에 더 가깝게 붙도록 폭 제한 해제 */
-.main.room-playing { max-width: none; }
+/* 멀티플레이 게임 진행 중: 채팅 사이드바를 뷰포트 오른쪽 끝에 고정(가운데 정렬된 .main 폭과 무관하게 항상 화면 끝에 붙음) */
+.content.room-playing { margin-right: 316px; }
+.sidebar.in-game {
+  position: fixed; right: 16px; top: calc(var(--nav-h) + 18px);
+  height: calc(100dvh - var(--nav-h) - 36px);
+}
 .content { flex: 1; min-width: 0; }
 .sidebar {
   width: 300px; flex: none; background: var(--surface); border: 1px solid var(--border);
