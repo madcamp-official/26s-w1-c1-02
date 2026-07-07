@@ -7,6 +7,7 @@ const signupRouter = require("./routes/signup");
 const loginRouter = require("./routes/login");
 const { optionalAuth } = require("./middleware/auth");
 const oauthRouter = require("./routes/oauth");
+const profileRouter = require("./routes/profile");
 const jamoApi = require("./vowel_game/api");
 const { cleanupExpiredPuzzles } = require("./vowel_game/puzzle");
 const { createProgressRouter } = require("./progress/api");
@@ -24,6 +25,9 @@ app.use("/api", loginRouter);
 
 // 소셜 로그인 (카카오/구글/네이버)
 app.use("/auth", oauthRouter);
+
+// 프로필 (닉네임 설정 — 소셜 로그인 직후 실명 노출 방지용)
+app.use("/api", optionalAuth, profileRouter);
 
 // 게임 API — 자음 모음 조합 (PostgreSQL)
 app.use("/api/games/jamo", optionalAuth, jamoApi);

@@ -12,7 +12,7 @@ async function findOrCreateSocialUser(provider, profile) {
     "SELECT id, username, email, nickname FROM users WHERE provider = $1 AND provider_id = $2",
     [provider, profile.providerId]
   );
-  if (rows[0]) return rows[0];
+  if (rows[0]) return { user: rows[0], isNew: false };
 
   const username = `${provider}_${profile.providerId}`;
   const nickname = profile.nickname || `${provider}유저`;
@@ -22,17 +22,17 @@ async function findOrCreateSocialUser(provider, profile) {
      RETURNING id, username, email, nickname`,
     [username, profile.email, nickname, provider, profile.providerId]
   );
-  return inserted[0];
+  return { user: inserted[0], isNew: true };
 }
 
-function issueTokenAndRedirect(res, user) {
+function issueTokenAndRedirect(res, user, isNew) {
   const token = jwt.sign(
     { userId: user.id, username: user.username, nickname: user.nickname },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
   const query = new URLSearchParams({ token, username: user.username, nickname: user.nickname }).toString();
-  res.redirect(`/?${query}#lobby`);
+  res.redirect(`/?${query}#${isNew ? "nickname-setup" : "lobby"}`);
 }
 
 router.get("/kakao", (req, res) => {
@@ -46,9 +46,9 @@ router.get("/kakao/callback", async (req, res) => {
 
     const accessToken = await kakao.getAccessToken(code);
     const profile = await kakao.getProfile(accessToken);
-    const user = await findOrCreateSocialUser("kakao", profile);
+    const { user, isNew } = await findOrCreateSocialUser("kakao", profile);
 
-    issueTokenAndRedirect(res, user);
+    issueTokenAndRedirect(res, user, isNew);
   } catch (err) {
     console.error("kakao 로그인 실패:", err.message);
     res.redirect("/?social_error=1#login");
@@ -66,9 +66,9 @@ router.get("/google/callback", async (req, res) => {
 
     const accessToken = await google.getAccessToken(code);
     const profile = await google.getProfile(accessToken);
-    const user = await findOrCreateSocialUser("google", profile);
+    const { user, isNew } = await findOrCreateSocialUser("google", profile);
 
-    issueTokenAndRedirect(res, user);
+    issueTokenAndRedirect(res, user, isNew);
   } catch (err) {
     console.error("google 로그인 실패:", err.message);
     res.redirect("/?social_error=1#login");
@@ -87,9 +87,9 @@ router.get("/naver/callback", async (req, res) => {
 
     const accessToken = await naver.getAccessToken(code, state);
     const profile = await naver.getProfile(accessToken);
-    const user = await findOrCreateSocialUser("naver", profile);
+    const { user, isNew } = await findOrCreateSocialUser("naver", profile);
 
-    issueTokenAndRedirect(res, user);
+    issueTokenAndRedirect(res, user, isNew);
   } catch (err) {
     console.error("naver 로그인 실패:", err.message);
     res.redirect("/?social_error=1#login");

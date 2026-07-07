@@ -7,8 +7,22 @@
   let GUEST_ID = localStorage.getItem("mgh.username") || ("손님" + Math.floor(1000 + Math.random() * 9000));
   // ---- 화면에 표시할 이름: 로그인 시 닉네임, 로그인 전엔 손님 아이디 ----
   let DISPLAY_NAME = localStorage.getItem("mgh.nickname") || GUEST_ID;
+  // 소셜 로그인 직후 닉네임 확정 전까지는 소켓에 identify(실명일 수 있는 값)를 보내지 않는다
+  let awaitingNicknameConfirm = (location.hash || "").replace("#", "") === "nickname-setup";
   const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
   const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
+
+  // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
+  function logout() {
+    localStorage.removeItem("mgh.token");
+    localStorage.removeItem("mgh.username");
+    localStorage.removeItem("mgh.nickname");
+    GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
+    DISPLAY_NAME = GUEST_ID;
+    awaitingNicknameConfirm = false;
+    net.identify(DISPLAY_NAME);
+    go("login");
+  }
 
   // ---- app state ----
   const state = { view: "login", online: 1, gameCleanup: null, contentCleanup: null };
@@ -38,7 +52,7 @@
       if (this.socket || typeof io === "undefined") return;
       const socket = io({ path: "/socket.io" });
       this.socket = socket;
-      socket.on("connect", () => { this.connected = true; socket.emit("identify", DISPLAY_NAME); this.emit(); });
+      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", DISPLAY_NAME); this.emit(); });
       socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
       socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
       socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
@@ -205,17 +219,7 @@
       o.querySelectorAll("[data-theme-opt]").forEach((x) => x.classList.toggle("active", x === b));
     }));
 
-    // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
-    o.querySelector("#btn-logout")?.addEventListener("click", () => {
-      localStorage.removeItem("mgh.token");
-      localStorage.removeItem("mgh.username");
-      localStorage.removeItem("mgh.nickname");
-      GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
-      DISPLAY_NAME = GUEST_ID;
-      net.identify(DISPLAY_NAME);
-      close();
-      go("login");
-    });
+    o.querySelector("#btn-logout")?.addEventListener("click", () => { close(); logout(); });
 
     document.body.appendChild(o);
   }
@@ -1025,6 +1029,59 @@
     return shell;
   }
 
+  // 소셜 로그인 직후 닉네임 확인/설정 (구글/네이버는 실명이 그대로 넘어올 수 있어 확인 절차 필요)
+  function nicknameSetupView() {
+    const shell = h(`
+      <div class="app-shell login-shell">
+        <header class="login-top">
+          <div class="nav-brand">
+            <div class="nav-logo">미</div>
+            <div class="nav-title">미니게임천국</div>
+          </div>
+        </header>
+        <main class="login-main">
+          <form class="login-card" id="nickname-form">
+            <div class="login-or"><span>다른 유저에게 보여질 닉네임을 입력해주세요</span></div>
+            <input class="login-input" id="nickname-input" placeholder="닉네임" maxlength="20" autocomplete="off" />
+            <div class="login-div"></div>
+            <div class="login-actions">
+              <button type="submit" class="login-btn primary">닉네임 설정하기</button>
+              <button type="button" class="login-btn" id="nickname-cancel">다른 계정으로 로그인</button>
+            </div>
+          </form>
+        </main>
+      </div>`);
+
+    shell.querySelector("#nickname-cancel").addEventListener("click", logout);
+    shell.querySelector("#nickname-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nickname = shell.querySelector("#nickname-input").value.trim();
+      if (!nickname) { toast("닉네임을 입력해주세요."); return; }
+      try {
+        const token = localStorage.getItem("mgh.token");
+        const res = await fetch("/api/profile/nickname", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ nickname }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast(data.message || "닉네임 설정에 실패했습니다.");
+          if (res.status === 401) logout();
+          return;
+        }
+        DISPLAY_NAME = data.nickname;
+        localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+        awaitingNicknameConfirm = false;
+        net.identify(DISPLAY_NAME);
+        go("lobby");
+      } catch {
+        toast("서버에 연결할 수 없습니다.");
+      }
+    });
+    return shell;
+  }
+
   // ---------- router ----------
   let mountedSidebar = null;
   function render() {
@@ -1033,10 +1090,15 @@
     if (mountedSidebar && mountedSidebar._cleanup) mountedSidebar._cleanup();
     mountedSidebar = null;
 
-    // 로그인 화면은 독립 레이아웃 (표준 네비/사이드바 없음)
+    // 로그인 / 닉네임 설정 화면은 독립 레이아웃 (표준 네비/사이드바 없음)
     if (state.view === "login") {
       app.innerHTML = "";
       app.appendChild(loginView());
+      return;
+    }
+    if (state.view === "nickname-setup") {
+      app.innerHTML = "";
+      app.appendChild(nicknameSetupView());
       return;
     }
 
@@ -1107,8 +1169,7 @@
   }
 
   const initial = (location.hash || "").replace("#", "");
-  if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel"].includes(initial)) state.view = initial;
-  if (tokenFromUrl) state.view = "lobby";
+  if (["login", "lobby", "solo", "multi", "game:spot", "game:vowel", "nickname-setup"].includes(initial)) state.view = initial;
   render();
 
   // BGM이 켜진 상태로 저장돼 있으면, 브라우저 자동재생 정책상 첫 클릭에서 재생 시작
