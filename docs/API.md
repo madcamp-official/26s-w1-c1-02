@@ -192,17 +192,23 @@
 - **404** `not_found` · **500** `server_error`
 
 #### `POST /api/games/jamo/level-clear`
-레벨제 싱글에서 클리어한 레벨 반영. **로그인 필요**. (공용 진행도 라우터)
+레벨제 싱글에서 클리어한 레벨 반영. **로그인 필요**. (공용 진행도 라우터, `game="jamo"`)
 
-**요청 본문**: `{ "level": 5 }` → 기존 레벨과 `GREATEST`로 갱신.
+**요청 본문**: `{ "level": 5 }` → `user_game_progress.meta.jamo.level`을 기존 값과 `GREATEST`로 갱신(깬 레벨 수, 0 기준). 다음 레벨이 열린다.
 
 **응답 · 200** `{ "ok": true }`
 - **401** `login_required` · **400** `bad_request` · **500** `server_error`
 
 #### `GET /api/games/jamo/progress`
-현재 유저의 레벨/클리어 수. **로그인 필요**.
+현재 유저의 진행도. **로그인 필요**.
 
-**응답 · 200** `{ "level": 5, "cleared_count": 12 }` (기록 없으면 `{ "level": 1, "cleared_count": 0 }`)
+**응답 · 200**
+```json
+{ "soloLevel": 5, "level": 1, "exp": 320, "best_score": 92, "meta": { "jamo": { "level": 5 }, "spot": { "level": 2 } } }
+```
+- `soloLevel`: **이 게임(jamo)**의 깬 레벨 수(= `meta.jamo.level`). 0이면 레벨 1만 플레이 가능
+- `level`/`exp`/`best_score`: 유저 단위 종합값(게임 무관, `user_game_progress` 테이블 참고)
+- 기록 없으면 전부 기본값(`soloLevel: 0, level: 1, exp: 0, best_score: 0, meta: {}`)
 - **401** `login_required` · **500** `server_error`
 
 ---
@@ -212,10 +218,10 @@
 베이스 경로 `/api/games/spot`. 싱글 게임 로직은 클라이언트 전용이고, **레벨 진행도만** 서버에 저장한다(jamo와 동일한 공용 진행도 라우터, `game="spot"`).
 
 #### `POST /api/games/spot/level-clear`
-`{ "level": <int> }` → **200** `{ "ok": true }`. **로그인 필요**(401 `login_required`).
+`{ "level": <int> }` → **200** `{ "ok": true }`. **로그인 필요**(401 `login_required`). jamo와 동일하게 `meta.spot.level`을 갱신.
 
 #### `GET /api/games/spot/progress`
-**200** `{ "level": <int>, "cleared_count": <int> }`. **로그인 필요**.
+**200** `{ "soloLevel": <int>, "level": <int>, "exp": <int>, "best_score": <int>, "meta": {...} }`. 필드 의미는 jamo `/progress`와 동일(`soloLevel`이 `meta.spot.level`을 가리킴). **로그인 필요**.
 
 > 다른 그림 찾기 **멀티플레이**는 아래 [실시간 API](#실시간-게임-다른-그림-찾기-spot)에서 서버 권위로 진행되며 DB에 저장하지 않는다(휘발성).
 
@@ -399,12 +405,13 @@ const socket = io("https://minigameheaven-v1.madcamp-kaist.org", { path: "/socke
 | --- | --- | --- |
 | `users` | 계정(로컬+소셜 통합) | `username`(unique), `email`, `password_hash`, `nickname`, `provider`, `provider_id` |
 | `game_results` | 모든 게임 공용 플레이 기록 | `user_id?`, `game`, `puzzle_id?`, `is_correct`, `score`, `mode`, `room_id?` |
-| `user_game_progress` | 게임별 진행도(유저×게임 복합키) | `level`, `exp`, `cleared_count`, `best_score`, `meta(jsonb)` |
+| `user_game_progress` | 유저당 1행. 종합 지표 + 게임별 싱글 레벨(`meta`) | `level`, `exp`, `best_score`, `meta(jsonb)` — `meta.<game>.level` = 깬 레벨 수 |
 | `words` | 자모 게임 사전 | `word`(unique), `jamo_key`, `syllable_count`, `is_puzzle_seed` |
 | `jamo_puzzles` | 발급된 자모 문제(정답 서버 보관) | `jamo_key`, `jamo_display(jsonb)`, `difficulty`, `source_word_id`(FK), `expires_at` |
 
 - **`game` 컬럼은 범용 문자열**(`"jamo"`, `"spot"` 등)이라 새 게임 추가 시 스키마 변경이 필요 없다.
 - `game_results.mode`/`room_id`는 멀티플레이 결과 연동을 위한 예비 컬럼(현재 `jamo` 싱글 제출만 기록).
+- 테이블 구조와 컬럼별 상세 설명은 **[DB 스키마 문서](./DB.md)** 참고.
 
 ---
 

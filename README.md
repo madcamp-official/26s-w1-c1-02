@@ -62,7 +62,10 @@ https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86
 
 > 필요한 테이블, 주요 필드, 데이터 타입, 테이블 간 관계를 정리
 
-<!-- ERD 이미지 또는 테이블 정의 -->
+- **DB**: PostgreSQL 단일 DB (계정 + 게임 데이터 통합). 멀티플레이 방/실시간 대전 상태는 서버 메모리(휘발성)
+- **테이블**: `users`(계정), `game_results`(플레이 기록), `user_game_progress`(게임별 진행도), `words`/`jamo_puzzles`(자모 게임 전용)
+
+자세한 컬럼 정의·관계·설계 배경은 **[docs/DB.md](./docs/DB.md)** 참고.
 
 ---
 
@@ -70,14 +73,11 @@ https://www.figma.com/design/5dNhFDPv5Q5LF7plrxmMp4/%EC%A0%9C%EB%AA%A9-%EC%97%86
 
 > API 주소, 요청 방식, 요청값, 응답값, 에러 상황을 정리
 
-| Method | Endpoint | 설명 | 요청 | 응답 |
-|---|---|---|---|---|
-| POST | /api/signup | 회원가입 | `{ username, email, password, nickname }` | 201: `{ token, user: { id, username, email, nickname } }` <br> 400: 필드 누락 <br> 409: 아이디 중복 |
-| POST | /api/login | 로그인 | `{ username, password }` | 200: `{ token, user: { id, username, email, nickname } }` <br> 400: 필드 누락 <br> 401: 아이디/비밀번호 불일치 |
+- **베이스 URL**: `https://minigameheaven-v1.madcamp-kaist.org`
+- **인증**: JWT Bearer 토큰(`Authorization: Bearer <token>`, 만료 7일). 게임 API는 비로그인(게스트) 플레이도 허용
+- **API 종류**: REST(회원가입/로그인/소셜 로그인/프로필/게임 진행도) + Socket.IO(로비 채팅/멀티플레이 방/실시간 대전)
 
-- 인증 방식: JWT (`Authorization: Bearer <token>`, 만료 7일)
-- 비밀번호는 bcrypt로 해싱하여 저장
-- 소셜 로그인(카카오/구글 등)은 추후 추가 예정
+전체 엔드포인트·요청/응답 스키마·에러 코드·실시간 이벤트 명세는 **[docs/API.md](./docs/API.md)** 참고.
 
 ---
 
