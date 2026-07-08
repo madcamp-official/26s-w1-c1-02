@@ -408,7 +408,7 @@
   function sidebarChat() {
     const el = h(`
       <aside class="sidebar">
-        <div class="side-head"><div class="t">💬 전체 채팅</div><div class="c">${state.online}명</div></div>
+        <div class="side-head"><div class="t">💬 전체 채팅</div><div class="c" id="chat-count">0명</div></div>
         <div class="side-scroll" id="chat-scroll"></div>
         <div class="side-input">
           <input id="chat-input" placeholder="메시지 입력..." maxlength="120" />
@@ -417,12 +417,14 @@
       </aside>`);
 
     const scroll = el.querySelector("#chat-scroll");
+    const count = el.querySelector("#chat-count");
     const input = el.querySelector("#chat-input");
     function paint() {
+      count.textContent = `${net.presence.length || (net.connected ? 1 : 0)}명`;
       scroll.innerHTML = net.chat.map((m) =>
         m.sys
           ? `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`
-          : `<div class="chat-line"><span class="u">${escape(m.user)}</span>${escape(m.text)}</div>`
+          : `<div class="chat-line"><span class="u" style="--u-hue:${userHue(m.user)}">${escape(m.user)}</span>${escape(m.text)}</div>`
       ).join("");
       scroll.scrollTop = scroll.scrollHeight;
     }
@@ -576,7 +578,10 @@
         else toast(`"${g.title}"는 준비 중이에요.`);
       });
     });
-    return [content, sidebarChat()];
+    // 전체 채팅을 페이지 오른쪽 끝에 고정 (멀티 로비와 동일). 콘텐츠는 오른쪽 여백만 확보.
+    const chatSide = sidebarChat(); chatSide.classList.add("lobby-chat");
+    content.classList.add("pad-right");
+    return [content, chatSide];
   }
 
   function spotGameView() {
@@ -889,7 +894,12 @@
     net.listeners.add(listener);
     content._cleanup = () => net.listeners.delete(listener);
     paint();
-    return [content, sidebarUsers()];
+    // 접속자 패널은 페이지 왼쪽 끝, 전체 채팅(싱글 로비와 공유)은 오른쪽 끝에 고정 —
+    // 가운데 정렬된 방 목록과 독립적으로 뷰포트 양끝에 붙는다.
+    const chatSide = sidebarChat(); chatSide.classList.add("lobby-chat");
+    const usersSide = sidebarUsers(); usersSide.classList.add("lobby-users");
+    content.classList.add("pad-left", "pad-right");
+    return [content, chatSide, usersSide];
   }
 
   function sidebarRoomChat() {
@@ -914,7 +924,7 @@
       scroll.innerHTML = net.roomChat.map((m) =>
         m.sys
           ? `<div class="chat-line"><span class="sys">${escape(m.text)}</span></div>`
-          : `<div class="chat-line"><span class="u">${escape(m.user)}</span>${escape(m.text)}</div>`
+          : `<div class="chat-line"><span class="u" style="--u-hue:${userHue(m.user)}">${escape(m.user)}</span>${escape(m.text)}</div>`
       ).join("");
       scroll.scrollTop = scroll.scrollHeight;
     }
@@ -952,11 +962,13 @@
         onFinish: () => { gameFinished = true; },
       });
       content.classList.add("room-playing");
+      if (exitFab) exitFab.hidden = false;
     }
     function unmountGame() {
       if (gameCleanup) { gameCleanup(); gameCleanup = null; }
       gameMounted = false; gameFinished = false;
       content.classList.remove("room-playing");
+      if (exitFab) exitFab.hidden = true;
     }
     function exitGame() { unmountGame(); paint(); }
 
@@ -964,6 +976,27 @@
       unmountGame();
       net.leaveRoom().then(() => go("multi"));
     }
+
+    // 방 나가기 — 경고 확인 후에만 실제 퇴장 (되돌릴 수 없는 동작)
+    async function promptLeave() {
+      const inGame = gameMounted && !gameFinished;
+      const ok = await confirmDialog({
+        title: "방에서 나갈까요?",
+        message: inGame
+          ? "게임이 진행 중입니다. 지금 나가면 현재 게임에서 빠지고 방 목록으로 돌아갑니다."
+          : "방에서 나가면 방 목록으로 돌아갑니다.",
+        confirmLabel: "나가기",
+        cancelLabel: "계속하기",
+        danger: true,
+      });
+      if (ok) leaveAndGoLobby();
+    }
+
+    // 게임 진행 중에는 방 헤더가 사라지므로, content 위에 떠 있는 나가기 버튼을 제공.
+    // (게임 엔진은 root 만 비우므로 content 의 자식으로 두면 게임 렌더와 무관하게 유지됨)
+    const exitFab = h(`<button class="room-exit-fab" title="방 나가기" hidden>🚪 나가기</button>`);
+    exitFab.addEventListener("click", promptLeave);
+    content.appendChild(exitFab);
 
     // 기어 메뉴: 바깥 클릭 시 닫기
     function onDocClick(e) {
@@ -1057,7 +1090,7 @@
         ${startHint && isHost && room.state === "wait" ? `<div class="room-start-hint">${escape(startHint)}</div>` : ""}
         <div class="room-slots">${slots}${emptySlots}</div>`;
 
-      root.querySelector("#room-back").addEventListener("click", leaveAndGoLobby);
+      root.querySelector("#room-back").addEventListener("click", promptLeave);
       const modeSel = root.querySelector("#room-mode");
       if (modeSel) modeSel.addEventListener("change", () => net.setMode(modeSel.value));
       const diffSel = root.querySelector("#room-diff");
@@ -1226,12 +1259,12 @@
   }
 
   // ---------- router ----------
-  let mountedSidebar = null;
+  let mountedSidebars = [];
   function render() {
     if (state.gameCleanup) { state.gameCleanup(); state.gameCleanup = null; }
     if (state.contentCleanup) { state.contentCleanup(); state.contentCleanup = null; }
-    if (mountedSidebar && mountedSidebar._cleanup) mountedSidebar._cleanup();
-    mountedSidebar = null;
+    mountedSidebars.forEach((s) => { if (s && s._cleanup) s._cleanup(); });
+    mountedSidebars = [];
 
     // 로그인 / 닉네임 설정 화면은 독립 레이아웃 (표준 네비/사이드바 없음)
     if (state.view === "login") {
@@ -1248,21 +1281,23 @@
     // 방에 참여 중이 아닌데 방 화면으로 온 경우 (새로고침 등) 로비로 되돌림
     if (state.view === "room" && !net.room) { state.view = "multi"; }
 
-    let content, sidebar;
-    if (state.view === "lobby") [content, sidebar] = lobbyView();
-    else if (state.view === "solo") [content, sidebar] = soloView();
-    else if (state.view === "game:spot") [content, sidebar] = spotGameView();
-    else if (state.view === "game:vowel") [content, sidebar] = vowelGameView();
-    else if (state.view === "game:word") [content, sidebar] = wordGameView();
-    else if (state.view === "multi") [content, sidebar] = multiView();
-    else if (state.view === "room") [content, sidebar] = roomView();
+    // 뷰는 [content, 오른쪽 사이드바, 왼쪽 사이드바(선택)] 를 반환
+    let content, sidebar, leftSidebar;
+    if (state.view === "lobby") [content, sidebar, leftSidebar] = lobbyView();
+    else if (state.view === "solo") [content, sidebar, leftSidebar] = soloView();
+    else if (state.view === "game:spot") [content, sidebar, leftSidebar] = spotGameView();
+    else if (state.view === "game:vowel") [content, sidebar, leftSidebar] = vowelGameView();
+    else if (state.view === "game:word") [content, sidebar, leftSidebar] = wordGameView();
+    else if (state.view === "multi") [content, sidebar, leftSidebar] = multiView();
+    else if (state.view === "room") [content, sidebar, leftSidebar] = roomView();
 
     state.contentCleanup = content && content._cleanup ? content._cleanup : null;
-    mountedSidebar = sidebar;
+    mountedSidebars = [sidebar, leftSidebar].filter(Boolean);
 
     const shell = h(`<div class="app-shell"></div>`);
     shell.appendChild(h(navHTML()));
     const main = h(`<div class="main"></div>`);
+    if (leftSidebar) main.appendChild(leftSidebar);
     main.appendChild(content);
     if (sidebar) main.appendChild(sidebar);
     shell.appendChild(main);
@@ -1284,6 +1319,12 @@
 
   // ---------- helpers ----------
   function escape(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  // 채팅 참여자 구분용 색상: 이름을 해시해 고정 색조(0~359)로 매핑. 명도는 테마별로 CSS가 조정.
+  function userHue(name) {
+    const s = String(name); let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return h;
+  }
   let toastTimer;
   function toast(msg) {
     let t = document.getElementById("toast");
@@ -1296,6 +1337,34 @@
     t.textContent = msg; t.style.opacity = "1";
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.style.opacity = "0"; }, 2200);
+  }
+
+  // 경고 확인 다이얼로그 (Promise<boolean>) — 되돌리기 어려운 동작 전 확인용
+  function confirmDialog({ icon = "⚠️", title, message = "", confirmLabel = "확인", cancelLabel = "취소", danger = false }) {
+    return new Promise((resolve) => {
+      const o = document.createElement("div");
+      o.className = "overlay";
+      o.innerHTML = `
+        <div class="modal">
+          <div class="big">${icon}</div>
+          <h2>${escape(title)}</h2>
+          ${message ? `<p>${escape(message)}</p>` : ""}
+          <div class="row">
+            <button class="btn" data-act="cancel">${escape(cancelLabel)}</button>
+            <button class="btn ${danger ? "danger" : "primary"}" data-act="ok">${escape(confirmLabel)}</button>
+          </div>
+        </div>`;
+      function close(val) { document.removeEventListener("keydown", onKey); o.remove(); resolve(val); }
+      function onKey(e) { if (e.key === "Escape") close(false); }
+      o.addEventListener("click", (e) => {
+        if (e.target === o) return close(false); // 바깥 클릭 = 취소
+        const act = e.target.closest("[data-act]");
+        if (act) close(act.dataset.act === "ok");
+      });
+      document.addEventListener("keydown", onKey);
+      document.body.appendChild(o);
+      const ok = o.querySelector('[data-act="ok"]'); if (ok) ok.focus();
+    });
   }
 
   // ---------- boot ----------
