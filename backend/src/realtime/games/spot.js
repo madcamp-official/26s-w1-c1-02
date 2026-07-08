@@ -6,6 +6,7 @@
 // 점수: 등수 + 격자 난이도(한 변 크기) + 절대 속도(남은 시간) 합산. 맞힌 사람 전원 득점.
 // 오답 클릭에는 짧은 쿨다운을 걸어 무작위 연타(브루트포스)를 방지한다.
 const { clampDiff, clampRounds } = require("./vowel");
+const { awardScoresToSockets } = require("../../progress/api");
 
 // 자산 없이 이모지 격자로 구성 (프론트 spot-difference.js 와 동일 계열)
 const POOL = ["🍎", "🍊", "🍋", "🍓", "🍇", "🍉", "🍑", "🥝", "🍒", "🥕", "🌽", "🍄", "🌸", "🌻", "🍀", "⭐", "🐱", "🐶", "🐰", "🐸", "🦊", "🐼", "🐵", "🐷"];
@@ -161,7 +162,12 @@ function createSpotGame(io, room, config) {
 
   function finish() {
     clearTimers();
-    io.to(room.id).emit("spot:gameover", { finalScores: scoreboard() });
+    const finalScores = scoreboard();
+    io.to(room.id).emit("spot:gameover", { finalScores });
+    // 최종 점수를 각 로그인 유저의 종합 exp로 적립(게스트는 무시) → 레벨 갱신 시 로비 반영
+    awardScoresToSockets(io, finalScores).then(() => {
+      if (typeof room.refreshPresence === "function") room.refreshPresence();
+    });
     if (typeof room.onGameEnd === "function") room.onGameEnd();
   }
 

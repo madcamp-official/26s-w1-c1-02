@@ -2,7 +2,7 @@
 const express = require("express");
 const { pool } = require("../db");
 const puzzle = require("./puzzle");
-const { createProgressRouter } = require("../progress/api");
+const { createProgressRouter, awardExp } = require("../progress/api");
 
 const router = express.Router();
 router.use(createProgressRouter("jamo")); // /level-clear, /progress (공용 레벨 진행도 API)
@@ -68,19 +68,18 @@ router.post("/submit", async (req, res) => {
       [req.userId || null, puzzleId, word, correct, score, elapsedMs || null]
     );
 
-    if (correct && req.userId) {
-      await pool.query(
-        `INSERT INTO user_game_progress (user_id, exp, best_score, updated_at)
-         VALUES ($1, $2, $2, now())
-         ON CONFLICT (user_id) DO UPDATE SET
-           exp        = user_game_progress.exp + $2,
-           best_score = GREATEST(user_game_progress.best_score, $2),
-           updated_at = now()`,
-        [req.userId, score]
-      );
-    }
+    // 맞히면 점수를 그대로 종합 exp로 적립(레벨=exp 5000당 +1 재계산). 게스트면 awardExp가 무시.
+    let progress = null;
+    if (correct) progress = await awardExp(req.userId, score);
 
-    res.json({ correct, score, matched: correct ? word : null, reason });
+    res.json({
+      correct,
+      score,
+      matched: correct ? word : null,
+      reason,
+      level: progress ? progress.level : undefined,
+      exp: progress ? progress.exp : undefined,
+    });
   } catch (e) {
     console.error("jamo/submit error:", e);
     res.status(500).json({ error: "server_error" });

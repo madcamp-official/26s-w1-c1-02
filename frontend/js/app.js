@@ -84,7 +84,7 @@
       if (this.socket || typeof io === "undefined") return;
       const socket = io({ path: "/socket.io" });
       this.socket = socket;
-      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", { name: DISPLAY_NAME, avatar: DISPLAY_AVATAR }); this.emit(); });
+      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", { name: DISPLAY_NAME, avatar: DISPLAY_AVATAR, token: localStorage.getItem("mgh.token") || null }); this.emit(); });
       socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
       socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
       socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
@@ -95,7 +95,7 @@
       socket.on("room:chat", (msg) => { this.roomChat.push(msg); if (this.roomChat.length > 200) this.roomChat.shift(); this.emit(); });
       socket.on("room:notice", (text) => toast(text));
     },
-    identify(name, avatar) { if (this.socket) this.socket.emit("identify", { name, avatar }); },
+    identify(name, avatar) { if (this.socket) this.socket.emit("identify", { name, avatar, token: localStorage.getItem("mgh.token") || null }); },
     sendChat(text) { if (this.socket) this.socket.emit("chat:message", text); },
     pushChat(msg) { this.chat.push(msg); if (this.chat.length > 200) this.chat.shift(); this.emit(); },
     sendRoomChat(text) { if (this.socket) this.socket.emit("room:chat", text); },
@@ -465,7 +465,8 @@
       scroll.innerHTML = ordered.map((u) => {
         const name = u.name || "손님";
         const me = u.id && u.id === myId;
-        return `<div class="user-row"><div class="av">${u.avatar || DEFAULT_AVATAR}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
+        const lvl = `<span class="lvl-tag">Lv.${u.level || 1}</span>`;
+        return `<div class="user-row"><div class="av">${u.avatar || DEFAULT_AVATAR}</div>${lvl}<span class="u" style="--u-hue:${userHue(name)}">${escape(name)}</span>${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
       }).join("");
     }
 
@@ -485,25 +486,38 @@
           <div class="stats">
             <div class="stat"><div class="n">0</div><div class="l">총 승리</div></div>
             <div class="stat"><div class="n">–</div><div class="l">승률</div></div>
-            <div class="stat"><div class="n">1</div><div class="l">레벨</div></div>
+            <div class="stat"><div class="n" id="my-level">1</div><div class="l">레벨</div></div>
           </div>
         </div>
         <div class="section-label">게임 모드 선택</div>
         <div class="mode-grid">
           <button class="mode-card" data-nav="solo">
-            <div class="mode-ic">👤</div>
+            <div class="mode-ic"><span class="ic-glyph">👤</span></div>
             <h3>혼자하기</h3>
             <p>AI 및 미니게임으로 혼자서 즐겨보세요. 다른 그림 찾기, 끝말잇기 등.</p>
             <div class="mode-cta">시작하기 →</div>
           </button>
           <button class="mode-card" data-nav="multi">
-            <div class="mode-ic">👥</div>
+            <div class="mode-ic"><span class="ic-glyph">👥</span></div>
             <h3>멀티플레이</h3>
             <p>다른 플레이어들과 실시간으로 대결하세요. 방을 만들거나 참가하세요.</p>
             <div class="mode-cta">입장하기 →</div>
           </button>
         </div>
       </div>`);
+
+    // 배너의 "레벨" 통계를 내 종합 레벨(presence)로 동기화 — 게임 후 exp 적립으로 오르면 자동 반영
+    const myLevelEl = content.querySelector("#my-level");
+    const syncLevel = () => {
+      const myId = net.socket && net.socket.id;
+      const me = net.presence.find((u) => u.id === myId);
+      if (me) myLevelEl.textContent = me.level || 1;
+    };
+    net.listeners.add(syncLevel);
+    content._cleanup = () => net.listeners.delete(syncLevel);
+    syncLevel();
+    // 싱글 게임 exp 적립은 REST라 소켓의 레벨이 갱신 안 됨 — 로비로 올 때 재-identify로 DB 최신 레벨을 다시 읽어온다
+    if (!awaitingNicknameConfirm) net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
     return [content, null];
   }
 

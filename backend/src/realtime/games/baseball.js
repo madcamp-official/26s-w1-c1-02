@@ -9,6 +9,11 @@
 //       같은 라운드에 둘 다 홈런이면 무승부, 한쪽만 홈런이면 그 사람 승. 한쪽이 먼저 홈런해도
 //       상대에게 그 라운드의 마지막 기회를 준다. (양쪽이 한 라운드 내내 아무 추측도 안 하면 무승부로 종료)
 
+const { awardScoresToSockets } = require("../../progress/api");
+
+// 결과별 exp(숫자야구는 누적 점수가 없어 승/무/패 고정치로 적립). best_score는 건드리지 않음.
+const BASEBALL_EXP = { win: 300, forfeitWin: 150, draw: 100, lose: 50 };
+
 // difficulty(1~2) → 자릿수
 const DIGIT_BY_DIFF = { 1: 3, 2: 4 };
 const clampDigits = (d) => DIGIT_BY_DIFF[d] || 3; // 기본 3자리
@@ -212,6 +217,15 @@ function createBaseballGame(io, room, config) {
       secrets: Object.fromEntries(order.map((id) => [id, secrets.get(id) || null])),
       boards: boardsObj(),
       players: playersPub(),
+    });
+    // 승/무/패 결과를 exp로 적립(누적 점수 개념이 없어 고정치, best_score 미갱신) → 레벨 갱신 시 로비 반영
+    const entries = order.map((id) => {
+      let exp = BASEBALL_EXP.draw; // 무승부
+      if (winnerId) exp = id === winnerId ? (res === "forfeit" ? BASEBALL_EXP.forfeitWin : BASEBALL_EXP.win) : BASEBALL_EXP.lose;
+      return { id, score: exp, bestScore: 0 };
+    });
+    awardScoresToSockets(io, entries).then(() => {
+      if (typeof room.refreshPresence === "function") room.refreshPresence();
     });
     timers.over = setTimeout(() => {
       if (typeof room.onGameEnd === "function") room.onGameEnd();

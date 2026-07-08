@@ -8,6 +8,65 @@ const { pool } = require("../db");
 // 새 싱글 게임을 추가하면 여기에 식별자만 덧붙이면 됨(프론트 PROGRESS_GAMES 와 동일하게 유지).
 const SOLO_GAMES = ["jamo", "spot", "wordchain"];
 
+// ── 종합 레벨 시스템 ──────────────────────────────────────────────
+// 싱글/멀티 게임에서 얻은 점수를 그대로 exp로 적립하고, exp EXP_PER_LEVEL 마다 레벨이 1 오른다.
+// (레벨 1 = 0~4999 exp, 레벨 2 = 5000~9999 exp, ...)  user_game_progress.level/exp 컬럼이 종합값.
+const EXP_PER_LEVEL = 5000;
+const levelForExp = (exp) => Math.floor(Math.max(0, exp) / EXP_PER_LEVEL) + 1;
+
+// 점수(gained)를 로그인 유저의 exp로 적립하고 종합 레벨을 재계산한다.
+// userId 가 없으면(게스트) 아무것도 안 하고 null 반환 → 호출부에서 게스트 분기 불필요.
+// opts.bestScore: 프로필 최고점수 비교용(기본은 gained; 숫자야구처럼 점수 개념이 없으면 0을 넘겨 미갱신).
+// 갱신된 { level, exp } 반환.
+async function awardExp(userId, amount, opts = {}) {
+  const gained = Math.round(Number(amount) || 0);
+  if (!userId || gained <= 0) return null;
+  const best = opts.bestScore != null ? Math.round(Number(opts.bestScore) || 0) : gained;
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO user_game_progress (user_id, exp, level, best_score, updated_at)
+       VALUES ($1, $2, $3, $4, now())
+       ON CONFLICT (user_id) DO UPDATE SET
+         exp        = user_game_progress.exp + $2,
+         level      = floor((user_game_progress.exp + $2) / $5) + 1,
+         best_score = GREATEST(user_game_progress.best_score, $4),
+         updated_at = now()
+       RETURNING level, exp`,
+      [userId, gained, levelForExp(gained), best, EXP_PER_LEVEL]
+    );
+    return rows[0] || null;
+  } catch (e) {
+    console.error("awardExp error:", e.message);
+    return null;
+  }
+}
+
+// 멀티플레이 게임오버용: 각 소켓의 최종 점수를 로그인 유저 exp로 적립.
+// entries: [{ id: socketId, score, bestScore? }]. userId 는 서버가 JWT 로 확인한
+// sock.data.userId 만 신뢰(클라가 보낸 값이 아님). 적립 후 sock.data.level 을 갱신해
+// 로비 접속자 목록에 바로 반영되게 한다(호출부에서 presence 재브로드캐스트).
+async function awardScoresToSockets(io, entries) {
+  for (const e of entries || []) {
+    const sock = io.of("/").sockets.get(e && e.id);
+    const userId = sock && sock.data && sock.data.userId;
+    if (!userId) continue;
+    const prog = await awardExp(userId, e.score, e.bestScore != null ? { bestScore: e.bestScore } : {});
+    if (prog) sock.data.level = prog.level;
+  }
+}
+
+// 유저의 현재 종합 레벨 조회(로비 표시용). 행이 없거나 오류면 1.
+async function getUserLevel(userId) {
+  if (!userId) return 1;
+  try {
+    const { rows } = await pool.query(`SELECT level FROM user_game_progress WHERE user_id = $1`, [userId]);
+    return (rows[0] && rows[0].level) || 1;
+  } catch (e) {
+    console.error("getUserLevel error:", e.message);
+    return 1;
+  }
+}
+
 // 유저 생성 직후 호출. 모든 싱글 게임의 깬 레벨 수를 0(아직 못 깸 → 레벨 1만 열림)으로 초기화.
 // 이미 행이 있으면 건드리지 않는다(idempotent).
 async function initUserProgress(userId) {
@@ -79,4 +138,13 @@ function createProgressRouter(game) {
   return router;
 }
 
-module.exports = { createProgressRouter, initUserProgress, SOLO_GAMES };
+module.exports = {
+  createProgressRouter,
+  initUserProgress,
+  SOLO_GAMES,
+  EXP_PER_LEVEL,
+  levelForExp,
+  awardExp,
+  awardScoresToSockets,
+  getUserLevel,
+};

@@ -5,6 +5,7 @@
 // 점수: 등수 + 그 단어의 난이도(자모 개수) + 절대 속도(남은 시간) 세 축을 합산.
 //   맞힌 사람 전원 득점. 힌트: 제한시간 2/3 경과 시 정답 첫 음절 공개.
 const puzzle = require("../../vowel_game/puzzle");
+const { awardScoresToSockets } = require("../../progress/api");
 
 // 난이도(4단계) → 출제 음절 수 범위
 const MP_DIFF = {
@@ -175,7 +176,12 @@ function createVowelGame(io, room, config) {
 
   function finish() {
     clearTimers();
-    io.to(room.id).emit("vowel:gameover", { finalScores: scoreboard() });
+    const finalScores = scoreboard();
+    io.to(room.id).emit("vowel:gameover", { finalScores });
+    // 최종 점수를 각 로그인 유저의 종합 exp로 적립(게스트는 무시) → 레벨 갱신 시 로비 반영
+    awardScoresToSockets(io, finalScores).then(() => {
+      if (typeof room.refreshPresence === "function") room.refreshPresence();
+    });
     // 방을 대기실로 되돌림 — rooms.js 가 room.game 정리를 맡음
     if (typeof room.onGameEnd === "function") room.onGameEnd();
   }
