@@ -54,8 +54,10 @@
           const r = await fetch("/api/games/wordchain/progress", { headers: { Authorization: `Bearer ${token}` } });
           if (!r.ok) return;
           const data = await r.json();
-          if (typeof data.level === "number") {
-            cleared = Math.min(MAX_LEVEL, Math.max(0, data.level));
+          // 종목별 싱글 레벨 진행도는 서버가 내려주는 soloLevel(= meta.wordchain.level = 깬 레벨 수).
+          const soloLevel = data.soloLevel ?? data.meta?.wordchain?.level;
+          if (typeof soloLevel === "number") {
+            cleared = Math.min(MAX_LEVEL, Math.max(0, soloLevel));
             if (ended) showLevelSelect();
           }
         } catch (e) { /* 네트워크 오류 시 기존 표시값 유지 */ }
