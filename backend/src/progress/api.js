@@ -6,7 +6,7 @@ const { pool } = require("../db");
 
 // 싱글모드(레벨제) 게임 목록 — 유저 생성 시 이 게임들의 레벨 진행도를 0으로 초기화한다.
 // 새 싱글 게임을 추가하면 여기에 식별자만 덧붙이면 됨(프론트 PROGRESS_GAMES 와 동일하게 유지).
-const SOLO_GAMES = ["jamo", "spot"];
+const SOLO_GAMES = ["jamo", "spot", "wordchain"];
 
 // 유저 생성 직후 호출. 모든 싱글 게임의 깬 레벨 수를 0(아직 못 깸 → 레벨 1만 열림)으로 초기화.
 // 이미 행이 있으면 건드리지 않는다(idempotent).
