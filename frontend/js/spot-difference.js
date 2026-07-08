@@ -1,5 +1,6 @@
 /* 다른 그림 찾기 (Spot the Difference) — 레벨제 싱글플레이.
-   레벨 = 두 그림에서 '단 하나' 다른 칸을 제한 시간 안에 찾으면 클리어(→ 다음 레벨 해금).
+   레벨 = 3라운드 연속. 각 라운드에서 두 그림 중 '단 하나' 다른 칸을 찾아야 하고,
+   제한 시간(레벨 전체 공용, 라운드 사이에도 계속 흐름) 안에 3라운드를 모두 통과하면 클리어(→ 다음 레벨 해금).
    오답 클릭은 남은 시간을 깎는 페널티. 시간이 0이 되면 게임오버. 진행도는 localStorage 저장.
    레벨이 오를수록 격자가 커지고, 같은 크기 구간에서는 제한 시간이 줄어든다.
    window.SpotDifference.mount(container, { onExit }) => cleanup */
@@ -15,6 +16,7 @@
 
   // ---------- 레벨 설정 (조정 쉬움) ----------
   const MAX_LEVEL = 20;
+  const ROUNDS = 3;                                    // 레벨당 통과해야 하는 라운드 수
   // 진행도(깬 레벨)의 단일 출처는 서버 DB(user_game_progress). 로그인 상태면 localStorage는 진행도에 관여하지 않는다.
   // 비로그인(손님)은 DB 행이 없으므로 이 브라우저에만 임시 저장한다.
   const LS_KEY = "mgh.spot.cleared";
@@ -25,12 +27,14 @@
 
   // 3레벨마다 격자를 한 단계 키운다(4×4→10×10). 같은 크기 구간에서는 레벨마다 제한 시간이 줄고,
   // 격자가 커질수록 기본 시간과 오답 페널티가 함께 커진다. 그래서 난이도는 레벨마다 단조 증가.
+  // 시간은 '라운드 1개당' 기준으로 잡고 ROUNDS배 해서 레벨 전체 공용 예산으로 쓴다.
+  // 라운드당 예산을 예전 단판 제한 시간보다 빡빡하게 잡아, 3라운드를 다 통과하려면 더 빨리 찾아야 한다.
   function levelConfig(n) {
     const band = Math.min(6, Math.floor((n - 1) / 3)); // 0..6 (격자 확대 단계)
     const size = 4 + band;                             // 4..10 (한 변 칸 수)
     const posInBand = (n - 1) % 3;                     // 같은 격자 크기 안에서의 순번(0,1,2)
-    const baseSeconds = 22 + band * 5;                 // 격자가 클수록 스캔 시간 더 부여
-    const seconds = baseSeconds - posInBand * 5;       // 같은 크기면 레벨마다 5초씩 감소
+    const perRound = (18 + band * 4) - posInBand * 4;  // 라운드 1개당 스캔 시간(초): 격자 클수록↑, 같은 크기면 레벨마다↓
+    const seconds = perRound * ROUNDS;                 // 레벨 전체(=ROUNDS라운드) 공용 제한 시간
     const penalty = 3 + band;                          // 오답 감점(초): 3..9
     return { rows: size, cols: size, seconds, penalty };
   }
@@ -52,6 +56,7 @@
 
       let timer = null;
       let level = 1, cfg = null, round = null, seconds = 0, misses = 0, ended = true;
+      let roundIndex = 0, transitioning = false; // roundIndex: 현재 라운드(0-based), transitioning: 라운드 전환 중 클릭 잠금
       // 화면 표시용 진행도(깬 레벨 수). 로그인 유저는 서버 DB에서 채운다. 손님은 이 브라우저 저장값으로 시작.
       let cleared = isLoggedIn() ? 0 : getGuestCleared();
 
@@ -100,7 +105,7 @@
           <div class="vg-levels">
             <div class="vg-levels-head">레벨 선택 <span class="vg-levels-sub">깬 레벨 ${cleared} / ${MAX_LEVEL}</span></div>
             <div class="vg-level-grid">${cells}</div>
-            <div class="vg-hint">제한 시간 안에 <b>단 하나</b> 다른 칸을 찾으면 클리어 · 오답은 시간 감점! 다음 레벨이 열려요</div>
+            <div class="vg-hint">제한 시간 안에 <b>${ROUNDS}라운드</b>를 모두 통과하면 클리어 · 오답은 시간 감점! 다음 레벨이 열려요</div>
           </div>`;
         container.querySelectorAll("[data-lvl]").forEach((b) =>
           b.addEventListener("click", () => startLevel(+b.dataset.lvl)));
@@ -109,6 +114,7 @@
       // ================= 레벨 플레이 =================
       function startLevel(n) {
         level = n; cfg = levelConfig(n);
+        roundIndex = 0; transitioning = false;
         round = buildRound(cfg.rows, cfg.cols);
         seconds = cfg.seconds; misses = 0; ended = false;
         render();
@@ -128,6 +134,7 @@
             <div class="sd-hud">
               <div class="sd-pill accent"><div class="l">남은 시간</div><div class="v" id="sd-time">${fmt(seconds)}</div></div>
               <div class="sd-pill"><div class="l">레벨</div><div class="v">${level}</div></div>
+              <div class="sd-pill"><div class="l">라운드</div><div class="v">${roundIndex + 1} / ${ROUNDS}</div></div>
               <div class="sd-pill"><div class="l">실수</div><div class="v" id="sd-miss">${misses}</div></div>
               <div style="flex:1"></div>
               <button class="btn" id="sd-quit">레벨 선택</button>
@@ -144,10 +151,22 @@
       }
 
       function onCell(i) {
-        if (ended || !round) return;
+        if (ended || transitioning || !round) return;
         if (i === round.diff) {
           container.querySelectorAll(`.sd-cell[data-i="${i}"]`).forEach((el) => el.classList.add("found"));
-          levelClear();
+          if (roundIndex < ROUNDS - 1) {
+            // 아직 남은 라운드가 있으면: 정답을 잠깐 보여준 뒤 다음 라운드로(타이머는 계속 흐름)
+            transitioning = true;
+            setTimeout(() => {
+              if (ended) return;               // 전환 대기 중 시간 종료된 경우 무시
+              roundIndex++;
+              round = buildRound(cfg.rows, cfg.cols);
+              transitioning = false;
+              render();
+            }, 550);
+          } else {
+            levelClear();                       // 마지막 라운드까지 통과 → 레벨 클리어
+          }
         } else {
           misses++;
           seconds = Math.max(0, seconds - cfg.penalty); // 오답 감점
