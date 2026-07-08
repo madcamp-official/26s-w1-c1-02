@@ -465,6 +465,9 @@ select.rm-input { appearance: none; cursor: pointer; }
 .login-btn { flex: 1; padding: 15px 0; border-radius: 14px; border: 0; font-size: 16px; font-weight: 800; cursor: pointer; }
 .login-btn.primary { background: #a68763; color: #fff; }
 .login-btn.primary:hover { background: #9a7a56; }
+.login-btn.ghost { background: #fdf9ee; color: var(--ink-soft); border: 1px solid #e7dcc7; }
+.login-btn.ghost:hover { background: #fffdf6; }
+.login-guest-note { margin: 4px 2px 0; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; }
 .login-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; margin: 10px 0 2px; }
 .login-or::before, .login-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 .social { display: flex; flex-direction: column; gap: 10px; }
@@ -513,6 +516,8 @@ select.rm-input { appearance: none; cursor: pointer; }
 :root[data-theme="dark"] .login-input::placeholder { color: #8a7a64; }
 :root[data-theme="dark"] .login-input:focus { background: #3a3128; }
 :root[data-theme="dark"] .login-div { background: #4a3f31; }
+:root[data-theme="dark"] .login-btn.ghost { background: #352d24; border-color: #45392d; }
+:root[data-theme="dark"] .login-btn.ghost:hover { background: #3d3329; }
 :root[data-theme="dark"] .banner { background: linear-gradient(135deg, #342a20, #2c241c); }
 :root[data-theme="dark"] .nav-tab:hover,
 :root[data-theme="dark"] .nav-icon,

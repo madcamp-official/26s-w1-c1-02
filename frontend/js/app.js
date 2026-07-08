@@ -219,7 +219,7 @@
           </div>
           ${state.view !== "login" ? `
           <div class="set-row">
-            <button class="logout-btn" id="btn-logout">🚪 로그아웃</button>
+            <button class="logout-btn" id="btn-logout">${localStorage.getItem("mgh.token") ? "🚪 로그아웃" : "🔑 로그인하기"}</button>
           </div>` : ""}
         </div>
       </div>`);
@@ -1119,6 +1119,9 @@
               <button type="button" class="social-btn naver">${ICON.naver}<span>네이버로 시작하기</span></button>
               <button type="button" class="social-btn google">${ICON.google}<span>Google로 시작하기</span></button>
             </div>
+            <div class="login-or"><span>또는</span></div>
+            <button type="button" class="login-btn ghost" id="btn-guest">손님으로 계속하기</button>
+            <p class="login-guest-note">로그인 없이 바로 플레이할 수 있어요. 멀티플레이는 가능하지만 진행도 저장과 프로필 설정은 로그인 후 이용할 수 있어요.</p>
           </form>
         </main>
       </div>`);
@@ -1151,6 +1154,12 @@
       }
     });
     shell.querySelector("#btn-signup").addEventListener("click", openSignup);
+    // 손님으로 계속: 로그인/토큰 없이 바로 로비로. 멀티플레이는 가능하되
+    // 진행도 저장·프로필 설정은 로그인 후에만 가능(각 기능에서 토큰 유무로 게이트).
+    shell.querySelector("#btn-guest").addEventListener("click", () => {
+      net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
+      go("lobby");
+    });
     shell.querySelectorAll(".social-btn").forEach((b) => {
       if (b.classList.contains("kakao")) {
         b.addEventListener("click", () => { location.href = "/auth/kakao"; });
