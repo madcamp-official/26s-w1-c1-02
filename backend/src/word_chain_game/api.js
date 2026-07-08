@@ -130,4 +130,27 @@ router.post("/hint", async (req, res) => {
   }
 });
 
+// POST /answers  { requiredChar, usedWords, minLength? }  → 실제 정답으로 인정되는 단어 예시 몇 개.
+// 게임오버 화면에서 "이 단어를 냈으면 됐다"를 그대로 보여주기 위함 — /hint와 달리 초성 마스킹을 하지
+// 않고 완전한 단어를 준다. /check와 동일한 조건(체인 시작 글자·중복·보스 글자 수)을 만족하는 것만.
+router.post("/answers", async (req, res) => {
+  const { requiredChar, usedWords, minLength } = req.body || {};
+  if (!requiredChar) return res.json({ answers: [] });
+  try {
+    const starts = acceptableStarts(requiredChar);
+    const conds = starts.map((_, i) => `word LIKE $${i + 1}`).join(" OR ");
+    const params = starts.map((c) => `${c}%`);
+    let sql = `SELECT word FROM words WHERE is_answer_ok AND (${conds})`;
+    if (minLength) sql += ` AND char_length(word) >= $${params.length + 1}`;
+    sql += ` ORDER BY freq DESC LIMIT 50`;
+    const { rows } = await pool.query(sql, minLength ? [...params, minLength] : params);
+    const used = new Set(usedWords || []);
+    const answers = rows.map((r) => r.word).filter((w) => !used.has(w)).slice(0, 5);
+    res.json({ answers });
+  } catch (e) {
+    console.error("wordchain/answers error:", e.message);
+    res.status(500).json({ error: "server_error" });
+  }
+});
+
 module.exports = router;

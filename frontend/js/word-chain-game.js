@@ -3,7 +3,10 @@
    매끄럽게(레벨1=90초·8개 → 레벨20=52초·14개) 빡빡해짐. 보스 글자 수(4→5)만 레벨16에서
    한 번 크게 올라감. 시계는 전체 시간 하나뿐 — "턴"은 시간이 아니라 개수(성공한 단어 수)로만 센다.
    오답/중복/보스조건 미달이면 목숨 1개 차감(같은 턴 재도전), 목숨이 다 떨어지면 종료.
-   5번째 턴마다 보스 턴. 검증/두음법칙/사전 조회는 백엔드 /api/games/wordchain.
+   5번째 턴마다 보스 턴. 단, 그 턴의 시작 글자로 만들 수 있는 조건 충족(글자 수) 단어가 하나도
+   없으면 보스를 다음 턴으로 미루고 이번 턴은 일반 턴으로 진행한다(막다른 보스로 인한 강제 종료 방지).
+   미뤄둔 보스가 남은 채 목표 개수를 채우면 클리어 대신 한 라운드 더 진행해 그 보스를 치른다.
+   검증/두음법칙/사전 조회는 백엔드 /api/games/wordchain.
    window.WordChainGame.mount(container,{onExit})=>cleanup */
 (function () {
   const MAX_LEVEL = 20;
@@ -42,10 +45,12 @@
       let chain = [], requiredChar = null, turnTimes = [], turnStartedAt = 0;
       let pendingRemaining = Infinity; // 지금 턴 시작 시점의 게이지 값(위험 보너스 판정용)
       let riskBonus = 0;
+      let bossPending = false;   // 보스가 예정됐지만 조건 충족 단어가 없어 다음 턴으로 미뤄진 상태
+      let bossThisTurn = false;  // 이번 턴이 실제 보스 턴으로 확정됐는지(미루기/강등 반영한 최종값)
       let cleared = isLoggedIn() ? 0 : getGuestCleared();
 
       const stop = () => { clearInterval(timer); timer = null; };
-      const isBossTurn = () => (chain.length + 1) % cfg.bossEvery === 0;
+      const scheduledBossTurn = () => (chain.length + 1) % cfg.bossEvery === 0; // 개수 기준 예정 보스 턴
 
       async function syncFromServer() {
         const token = localStorage.getItem("mgh.token");
@@ -86,13 +91,42 @@
         level = n; cfg = levelConfig(n);
         ended = false; lives = LIVES_START;
         chain = []; requiredChar = null; turnTimes = []; pendingRemaining = Infinity; riskBonus = 0;
+        bossPending = false; bossThisTurn = false;
         stop();
         container.innerHTML = `<div class="vg-error">문제 준비 중…</div>`;
         await seedStartWord(); // 서버가 시작 단어를 내려줌(항상 같은 쉬운 단어로 시작하는 것 방지)
         if (ended) return; // 로딩 중 레벨 선택으로 나갔으면 중단
         remain = cfg.totalTime; turnStartedAt = Date.now();
         timer = setInterval(tick, 1000);
+        await beginTurn();
+      }
+
+      // 이번 턴이 보스 턴인지 확정한 뒤 화면을 그린다. 예정 보스이거나 이전에 미뤄둔 보스면
+      // 후보지만, 조건(글자 수)을 만족하며 이어질 수 있는 단어가 실제로 없으면 보스를 다음 턴으로
+      // 미루고(bossPending) 이번 턴은 일반 턴으로 진행한다.
+      async function beginTurn() {
+        const candidate = bossPending || scheduledBossTurn();
+        if (candidate && requiredChar) {
+          if (await bossWordExists(requiredChar)) { bossThisTurn = true; bossPending = false; }
+          else { bossThisTurn = false; bossPending = true; } // 낼 수 있는 보스 단어가 없음 → 다음 턴으로 미룸
+        } else {
+          bossThisTurn = false; // 자유 시작 턴 등에선 보스 강제하지 않음
+        }
+        if (ended) return; // 확인하는 동안 레벨 선택으로 나갔으면 렌더 생략
         renderPlay();
+      }
+
+      // 보스 조건(글자 수)을 만족하면서 requiredChar로 이어질 수 있는 단어가 실제로 존재하는지 확인.
+      async function bossWordExists(reqChar) {
+        try {
+          const r = await fetch("/api/games/wordchain/answers", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requiredChar: reqChar, usedWords: chain, minLength: cfg.bossMinLength }),
+          });
+          if (!r.ok) return true; // 확인 실패 시 보스 유지(기존 동작) — 실수로 건너뛰지 않도록
+          const data = await r.json();
+          return !!(data.answers && data.answers.length);
+        } catch (e) { return true; }
       }
 
       async function seedStartWord() {
@@ -118,7 +152,7 @@
       }
 
       function renderPlay() {
-        const bossNow = isBossTurn();
+        const bossNow = bossThisTurn;
         container.innerHTML = `
           <div class="vg-wrap">
             <div class="vg-hud">
@@ -156,7 +190,7 @@
         if (ended) return;
         const input = container.querySelector("#wc-input");
         const word = input.value.trim(); if (!word) return;
-        const bossNow = isBossTurn();
+        const bossNow = bossThisTurn;
         try {
           const r = await fetch("/api/games/wordchain/check", {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -173,7 +207,7 @@
         }
       }
 
-      function onValid(word, data) {
+      async function onValid(word, data) {
         if (ended) return;
         const wasRisky = pendingRemaining <= RISK_THRESHOLD;
         if (wasRisky) riskBonus += RISK_BONUS;
@@ -182,8 +216,11 @@
         requiredChar = data.nextChar;
         pendingRemaining = data.remaining;
         turnStartedAt = Date.now();
-        if (chain.length >= cfg.goal) { levelClear(); return; }
-        renderPlay(); // 다음 턴(보스 여부 포함)을 새로 그림
+        // 목표 개수를 채웠어도 미뤄둔 보스가 남아있으면 클리어하지 않고 한 라운드 더 진행해
+        // 그 라운드에서 보스를 치른다. 미룬 보스가 없을 때만 클리어.
+        if (chain.length >= cfg.goal && !bossPending) { levelClear(); return; }
+        await beginTurn(); // 다음 턴(보스 여부·미루기 반영)을 확정하고 새로 그림
+        if (ended) return;
         showResult(`<span class="ok-msg">✓ ${word}${wasRisky ? ` <b>+${RISK_BONUS} 위험 보너스!</b>` : ""}</span>`);
         showGauge(data.acceptableNext, data.remaining);
       }
@@ -191,7 +228,7 @@
       async function useHint() {
         if (ended || !requiredChar) return;
         if (lives <= 1) { showResult(`<span class="bad-msg">목숨이 부족해서 힌트를 쓸 수 없어요.</span>`); return; }
-        const bossNow = isBossTurn();
+        const bossNow = bossThisTurn;
         try {
           const r = await fetch("/api/games/wordchain/hint", {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -280,14 +317,34 @@
         bind("#ov-select", showLevelSelect);
       }
 
-      function gameOver(reasonText) {
+      // 게임오버 시(시간 종료·목숨 소진 모두) 이번 턴에 이어질 수 있었던 실제 정답 단어들을 공개.
+      // /hint는 초성 마스킹(사ㅅㅂㄹ)을 주므로 게임오버 정답 공개에는 부적합 — 완전한 단어를 주는
+      // /answers를 사용한다.
+      async function fetchAnswerLine() {
+        if (!requiredChar) return ""; // 자유 시작 턴이면 특정 정답이 없음
+        try {
+          const bossNow = bossThisTurn;
+          const r = await fetch("/api/games/wordchain/answers", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requiredChar, usedWords: chain, minLength: bossNow ? cfg.bossMinLength : undefined }),
+          });
+          if (!r.ok) return "";
+          const data = await r.json();
+          if (!data.answers || !data.answers.length) return "";
+          return `<p>정답 예시: <b>${data.answers.slice(0, 5).join(", ")}</b></p>`;
+        } catch (e) { return ""; }
+      }
+
+      async function gameOver(reasonText) {
         if (ended) return;
         ended = true; stop();
+        const answerLine = await fetchAnswerLine();
         const stats = computeStats();
         overlay(`
           <div class="big">💥</div>
           <h2>게임 종료</h2>
           <p class="bad-msg">${reasonText}</p>
+          ${answerLine}
           ${statsHtml(stats)}
           <div class="row">
             <button class="btn primary" id="ov-retry">다시 도전</button>
