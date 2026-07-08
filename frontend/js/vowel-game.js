@@ -241,19 +241,33 @@
         bind("#ov-select", showLevelSelect);
       }
 
-      function gameOver() {
+      async function gameOver() {
         if (ended) return;
         ended = true; stop();
+        const answerLine = await fetchAnswerLine();
         overlay(`
           <div class="big">⏱️</div>
           <h2>시간 종료!</h2>
           <p>레벨 ${level} · ${solved} / ${cfg.goal} 단어 완성</p>
+          ${answerLine}
           <div class="row">
             <button class="btn primary" id="ov-retry">다시 도전</button>
             <button class="btn" id="ov-select">레벨 선택</button>
           </div>`);
         bind("#ov-retry", () => startLevel(level));
         bind("#ov-select", showLevelSelect);
+      }
+
+      // 시간 종료 시 마지막 문제의 정답(들)을 공개
+      async function fetchAnswerLine() {
+        if (!puzzle || !puzzle.puzzleId) return "";
+        try {
+          const r = await fetch(`/api/games/jamo/puzzle/${puzzle.puzzleId}/solutions`);
+          if (!r.ok) return "";
+          const data = await r.json();
+          if (!data.answers || !data.answers.length) return "";
+          return `<p>정답: <b>${data.answers.slice(0, 5).join(", ")}</b></p>`;
+        } catch (e) { return ""; }
       }
 
       function overlay(html) {
