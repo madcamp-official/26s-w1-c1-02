@@ -67,15 +67,25 @@ button { font-family: inherit; cursor: pointer; }
 .nav-tab.active { background: var(--accent-soft); color: var(--ink); }
 .nav-spacer { flex: 1; }
 .nav-right { display: flex; align-items: center; gap: 14px; color: var(--ink-soft); }
-.nav-online { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(122,154,95,.18); }
 .nav-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f3ece1; font-size: 15px; border: 0; cursor: pointer; color: inherit; }
 .nav-guest {
   display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px;
-  border-radius: 999px; background: #f3ece1;
+  border-radius: 999px; background: #f3ece1; border: 0; cursor: pointer; font: inherit; color: inherit;
 }
+.nav-guest:hover { background: var(--accent-soft); }
 .nav-guest .av { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; font-size: 13px; }
 .nav-guest .who { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+
+/* ---------- Profile modal (avatar picker) ---------- */
+.avatar-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.avatar-opt {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--card); font-size: 18px; display: grid; place-items: center; cursor: pointer;
+}
+.avatar-opt:hover { background: var(--accent-soft); }
+.avatar-opt.active { background: var(--accent-soft); border-color: var(--accent); }
+.profile-actions { display: flex; justify-content: center; margin-top: 18px; }
+.profile-actions .login-btn { flex: none; padding: 13px 36px; }
 
 /* ---------- Main / layout with sidebar ---------- */
 .main { flex: 1; display: flex; gap: 16px; padding: 18px 20px; max-width: 1440px; width: 100%; margin: 0 auto; }
@@ -254,7 +264,7 @@ select.rm-input { appearance: none; cursor: pointer; }
   border-radius: 12px; background: var(--card); border: 1px solid var(--border);
 }
 .slot.me-slot { border-color: var(--accent); }
-.slot .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; color: #fff; font-weight: 700; flex: none; }
+.slot .av { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; font-size: 16px; flex: none; }
 .slot-name { flex: 1; font-size: 15px; font-weight: 700; }
 .slot-badge { font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; background: var(--card-strong); color: var(--ink-soft); }
 .slot-badge.host { background: var(--card-strong); color: var(--ink-soft); }
@@ -275,7 +285,7 @@ select.rm-input { appearance: none; cursor: pointer; }
 .chat-line .u { font-weight: 700; color: var(--accent); margin-right: 4px; }
 .chat-line .sys { color: var(--muted); font-style: italic; }
 .user-row { display: flex; align-items: center; gap: 9px; font-size: 13px; }
-.user-row .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: #fff; }
+.user-row .av { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; font-size: 13px; }
 .user-row .me-tag { margin-left: auto; font-size: 11px; color: var(--muted); }
 .side-input { border-top: 1px solid var(--border); padding: 10px 12px; display: flex; gap: 8px; }
 .side-input input { flex: 1; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; font-size: 13px; background: var(--bg); color: var(--ink); }

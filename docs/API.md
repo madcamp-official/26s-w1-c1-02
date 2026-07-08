@@ -67,7 +67,7 @@
 ```json
 {
   "token": "<JWT>",
-  "user": { "id": 1, "username": "alice", "email": "a@b.com", "nickname": "앨리스" }
+  "user": { "id": 1, "username": "alice", "email": "a@b.com", "nickname": "앨리스", "avatar": "🙂" }
 }
 ```
 
@@ -109,8 +109,8 @@
 #### `GET /auth/kakao/callback` · `GET /auth/google/callback` · `GET /auth/naver/callback`
 공급자가 인가 코드(`code`)를 붙여 되돌아오는 콜백. 서버가 액세스 토큰 교환 → 프로필 조회 → 계정 조회/생성(`provider`+`provider_id` 기준) 후, **JWT를 쿼리스트링에 담아 프론트로 리다이렉트**한다.
 
-- 성공(신규 가입): `302 → /?token=...&username=...&nickname=...#nickname-setup`
-- 성공(기존 계정): `302 → /?token=...&username=...&nickname=...#lobby`
+- 성공(신규 가입): `302 → /?token=...&username=...&nickname=...&avatar=...#nickname-setup`
+- 성공(기존 계정): `302 → /?token=...&username=...&nickname=...&avatar=...#lobby`
 - 실패: `302 → /?social_error=1#login`
 - 네이버는 CSRF 방지용 `state` 파라미터를 검증한다(불일치 시 400).
 
@@ -139,6 +139,26 @@
 | 400 | 닉네임은 1자 이상 20자 이하로 입력해주세요. |
 | 401 | 로그인이 필요합니다. / 계정을 찾을 수 없습니다. 다시 로그인해주세요. |
 | 500 | 서버 오류로 닉네임을 저장하지 못했습니다. |
+
+#### `PATCH /api/profile/avatar`
+프로필 아이콘 변경. 파일 업로드가 아니라 서버 화이트리스트(`backend/src/avatars.js`)에 있는 이모지 중에서만 선택 가능. **인증 필요**.
+
+**요청 본문**
+```json
+{ "avatar": "🐱" }
+```
+
+**응답 · 200**
+```json
+{ "avatar": "🐱" }
+```
+
+**에러**
+| 상태 | message |
+| --- | --- |
+| 400 | 선택할 수 없는 아이콘입니다. |
+| 401 | 로그인이 필요합니다. / 계정을 찾을 수 없습니다. 다시 로그인해주세요. |
+| 500 | 서버 오류로 아이콘을 저장하지 못했습니다. |
 
 ---
 
@@ -403,7 +423,7 @@ const socket = io("https://minigameheaven-v1.madcamp-kaist.org", { path: "/socke
 
 | 테이블 | 용도 | 핵심 컬럼 |
 | --- | --- | --- |
-| `users` | 계정(로컬+소셜 통합) | `username`(unique), `email`, `password_hash`, `nickname`, `provider`, `provider_id` |
+| `users` | 계정(로컬+소셜 통합) | `username`(unique), `email`, `password_hash`, `nickname`, `avatar`, `provider`, `provider_id` |
 | `game_results` | 모든 게임 공용 플레이 기록 | `user_id?`, `game`, `puzzle_id?`, `is_correct`, `score`, `mode`, `room_id?` |
 | `user_game_progress` | 유저당 1행. 종합 지표 + 게임별 싱글 레벨(`meta`) | `level`, `exp`, `best_score`, `meta(jsonb)` — `meta.<game>.level` = 깬 레벨 수 |
 | `words` | 자모 게임 사전 | `word`(unique), `jamo_key`, `syllable_count`, `is_puzzle_seed` |

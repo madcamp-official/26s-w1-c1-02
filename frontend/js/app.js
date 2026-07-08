@@ -7,20 +7,25 @@
   let GUEST_ID = localStorage.getItem("mgh.username") || ("손님" + Math.floor(1000 + Math.random() * 9000));
   // ---- 화면에 표시할 이름: 로그인 시 닉네임, 로그인 전엔 손님 아이디 ----
   let DISPLAY_NAME = localStorage.getItem("mgh.nickname") || GUEST_ID;
+  // ---- 프로필 아이콘: 로그인 시 계정에 저장된 아이콘, 로그인 전엔 기본값 ----
+  const DEFAULT_AVATAR = "🙂";
+  let DISPLAY_AVATAR = localStorage.getItem("mgh.avatar") || DEFAULT_AVATAR;
+  // 프로필 설정에서 고를 수 있는 아이콘 목록 (서버 화이트리스트와 동일하게 유지)
+  const AVATARS = ["🙂", "😎", "🤖", "👻", "🐱", "🐶", "🦊", "🐻", "🐼", "🐰", "🦁", "🐸", "🐧", "🦄", "🐢", "🔥", "⭐", "🎮"];
   // 소셜 로그인 직후 닉네임 확정 전까지는 소켓에 identify(실명일 수 있는 값)를 보내지 않는다
   let awaitingNicknameConfirm = (location.hash || "").replace("#", "") === "nickname-setup";
-  const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
-  const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
   // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
   function logout() {
     localStorage.removeItem("mgh.token");
     localStorage.removeItem("mgh.username");
     localStorage.removeItem("mgh.nickname");
+    localStorage.removeItem("mgh.avatar");
     GUEST_ID = "손님" + Math.floor(1000 + Math.random() * 9000);
     DISPLAY_NAME = GUEST_ID;
+    DISPLAY_AVATAR = DEFAULT_AVATAR;
     awaitingNicknameConfirm = false;
-    net.identify(DISPLAY_NAME);
+    net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
     go("login");
   }
 
@@ -79,7 +84,7 @@
       if (this.socket || typeof io === "undefined") return;
       const socket = io({ path: "/socket.io" });
       this.socket = socket;
-      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", DISPLAY_NAME); this.emit(); });
+      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", { name: DISPLAY_NAME, avatar: DISPLAY_AVATAR }); this.emit(); });
       socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
       socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
       socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
@@ -90,7 +95,7 @@
       socket.on("room:chat", (msg) => { this.roomChat.push(msg); if (this.roomChat.length > 200) this.roomChat.shift(); this.emit(); });
       socket.on("room:notice", (text) => toast(text));
     },
-    identify(name) { if (this.socket) this.socket.emit("identify", name); },
+    identify(name, avatar) { if (this.socket) this.socket.emit("identify", { name, avatar }); },
     sendChat(text) { if (this.socket) this.socket.emit("chat:message", text); },
     pushChat(msg) { this.chat.push(msg); if (this.chat.length > 200) this.chat.shift(); this.emit(); },
     sendRoomChat(text) { if (this.socket) this.socket.emit("room:chat", text); },
@@ -251,6 +256,78 @@
     document.body.appendChild(o);
   }
 
+  function openProfile() {
+    if (document.getElementById("profile-overlay")) return;
+    let selectedAvatar = DISPLAY_AVATAR;
+    const o = h(`
+      <div class="overlay" id="profile-overlay">
+        <div class="settings">
+          <div class="settings-head"><h2>🙂 프로필</h2><button class="settings-close" title="닫기">✕</button></div>
+          <div class="set-row">
+            <div class="set-label"><span>닉네임</span></div>
+            <input class="login-input" id="profile-nickname" maxlength="20" value="${escape(DISPLAY_NAME)}" />
+          </div>
+          <div class="set-row">
+            <div class="set-label"><span>아이콘</span></div>
+            <div class="avatar-grid">
+              ${AVATARS.map((a) => `<button type="button" class="avatar-opt${a === DISPLAY_AVATAR ? " active" : ""}" data-avatar="${a}">${a}</button>`).join("")}
+            </div>
+          </div>
+          <div class="profile-actions">
+            <button class="login-btn primary" id="profile-save">저장</button>
+          </div>
+        </div>
+      </div>`);
+
+    const close = () => o.remove();
+    o.addEventListener("click", (e) => { if (e.target === o) close(); });
+    o.querySelector(".settings-close").addEventListener("click", close);
+
+    o.querySelectorAll("[data-avatar]").forEach((btn) => btn.addEventListener("click", () => {
+      selectedAvatar = btn.dataset.avatar;
+      o.querySelectorAll("[data-avatar]").forEach((b) => b.classList.toggle("active", b === btn));
+    }));
+
+    o.querySelector("#profile-save").addEventListener("click", async () => {
+      const nickname = o.querySelector("#profile-nickname").value.trim();
+      if (!nickname) { toast("닉네임을 입력해주세요."); return; }
+      const token = localStorage.getItem("mgh.token");
+      try {
+        if (nickname !== DISPLAY_NAME) {
+          const res = await fetch("/api/profile/nickname", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ nickname }),
+          });
+          const data = await res.json();
+          if (!res.ok) { toast(data.message || "닉네임 변경에 실패했습니다."); return; }
+          DISPLAY_NAME = data.nickname;
+          localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+          net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
+        }
+        if (selectedAvatar !== DISPLAY_AVATAR) {
+          const res = await fetch("/api/profile/avatar", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ avatar: selectedAvatar }),
+          });
+          const data = await res.json();
+          if (!res.ok) { toast(data.message || "아이콘 변경에 실패했습니다."); return; }
+          DISPLAY_AVATAR = data.avatar;
+          localStorage.setItem("mgh.avatar", DISPLAY_AVATAR);
+          net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
+        }
+        close();
+        render();
+        toast("프로필을 저장했습니다.");
+      } catch {
+        toast("서버에 연결할 수 없습니다.");
+      }
+    });
+
+    document.body.appendChild(o);
+  }
+
   function openSignup() {
     if (document.getElementById("signup-overlay")) return;
     const o = h(`
@@ -291,7 +368,9 @@
         localStorage.setItem("mgh.username", GUEST_ID);
         DISPLAY_NAME = data.user.nickname || GUEST_ID;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
-        net.identify(DISPLAY_NAME);
+        DISPLAY_AVATAR = data.user.avatar || DEFAULT_AVATAR;
+        localStorage.setItem("mgh.avatar", DISPLAY_AVATAR);
+        net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         close();
         go("lobby");
       } catch {
@@ -320,10 +399,8 @@
         </div>
         <div class="nav-spacer"></div>
         <div class="nav-right">
-          <div class="nav-online"><span class="dot-live"></span>${net.connected ? "실시간 연결됨" : "오프라인 모드"}</div>
-          <button class="nav-icon">🔔</button>
           <button class="nav-icon" id="nav-gear" title="설정">⚙️</button>
-          <div class="nav-guest"><div class="av">🙂</div><div class="who">${DISPLAY_NAME}</div></div>
+          <button class="nav-guest" id="nav-profile" title="프로필"><div class="av">${DISPLAY_AVATAR}</div><div class="who">${DISPLAY_NAME}</div></button>
         </div>
       </div>`;
   }
@@ -386,7 +463,7 @@
       scroll.innerHTML = ordered.map((u) => {
         const name = u.name || "손님";
         const me = u.id && u.id === myId;
-        return `<div class="user-row"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
+        return `<div class="user-row"><div class="av">${u.avatar || DEFAULT_AVATAR}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
       }).join("");
     }
 
@@ -938,7 +1015,7 @@
         else badge = `<span class="slot-badge ${p.ready ? "on" : "off"}">${p.ready ? "준비" : "대기중"}</span>`;
         return `
           <div class="slot filled${me ? " me-slot" : ""}">
-            <div class="av" style="background:${avColor(p.name)}">${escape(p.name[0] || "?")}</div>
+            <div class="av">${p.avatar || DEFAULT_AVATAR}</div>
             <span class="slot-name">${escape(p.name)}</span>
             ${badge}
           </div>`;
@@ -1065,7 +1142,9 @@
         localStorage.setItem("mgh.username", GUEST_ID);
         DISPLAY_NAME = data.user.nickname || GUEST_ID;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
-        net.identify(DISPLAY_NAME);
+        DISPLAY_AVATAR = data.user.avatar || DEFAULT_AVATAR;
+        localStorage.setItem("mgh.avatar", DISPLAY_AVATAR);
+        net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         go("lobby");
       } catch {
         toast("서버에 연결할 수 없습니다.");
@@ -1133,7 +1212,7 @@
         DISPLAY_NAME = data.nickname;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
         awaitingNicknameConfirm = false;
-        net.identify(DISPLAY_NAME);
+        net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         go("lobby");
       } catch {
         toast("서버에 연결할 수 없습니다.");
@@ -1191,15 +1270,13 @@
       el.addEventListener("click", () => go(el.dataset.nav))
     );
     shell.querySelector("#nav-gear")?.addEventListener("click", openSettings);
+    shell.querySelector("#nav-profile")?.addEventListener("click", () => {
+      if (!localStorage.getItem("mgh.token")) { toast("로그인 후 이용할 수 있습니다."); return; }
+      openProfile();
+    });
   }
 
   function go(view) { state.view = view; location.hash = view; render(); }
-
-  // update nav "connected" label when realtime state changes
-  net.listeners.add(() => {
-    const label = document.querySelector(".nav-online");
-    if (label) label.innerHTML = `<span class="dot-live"></span>${net.connected ? "실시간 연결됨" : "오프라인 모드"}`;
-  });
 
   // ---------- helpers ----------
   function escape(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
@@ -1226,6 +1303,8 @@
     localStorage.setItem("mgh.username", GUEST_ID);
     DISPLAY_NAME = bootParams.get("nickname") || GUEST_ID;
     localStorage.setItem("mgh.nickname", DISPLAY_NAME);
+    DISPLAY_AVATAR = bootParams.get("avatar") || DEFAULT_AVATAR;
+    localStorage.setItem("mgh.avatar", DISPLAY_AVATAR);
     history.replaceState(null, "", location.pathname + location.hash);
   }
 

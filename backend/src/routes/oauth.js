@@ -10,7 +10,7 @@ const router = express.Router();
 
 async function findOrCreateSocialUser(provider, profile) {
   const { rows } = await pool.query(
-    "SELECT id, username, email, nickname FROM users WHERE provider = $1 AND provider_id = $2",
+    "SELECT id, username, email, nickname, avatar FROM users WHERE provider = $1 AND provider_id = $2",
     [provider, profile.providerId]
   );
   if (rows[0]) return { user: rows[0], isNew: false };
@@ -20,7 +20,7 @@ async function findOrCreateSocialUser(provider, profile) {
   const { rows: inserted } = await pool.query(
     `INSERT INTO users (username, email, nickname, provider, provider_id)
      VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, username, email, nickname`,
+     RETURNING id, username, email, nickname, avatar`,
     [username, profile.email, nickname, provider, profile.providerId]
   );
   // 싱글 게임 레벨 진행도 초기화(모두 레벨 1). 실패해도 로그인은 계속(행 없으면 조회 시 기본 1).
@@ -34,7 +34,7 @@ function issueTokenAndRedirect(res, user, isNew) {
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
-  const query = new URLSearchParams({ token, username: user.username, nickname: user.nickname }).toString();
+  const query = new URLSearchParams({ token, username: user.username, nickname: user.nickname, avatar: user.avatar }).toString();
   res.redirect(`/?${query}#${isNew ? "nickname-setup" : "lobby"}`);
 }
 

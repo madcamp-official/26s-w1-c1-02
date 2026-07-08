@@ -3,6 +3,9 @@ const { Server } = require("socket.io");
 const { createVowelGame, clampDiff, clampRounds } = require("./games/vowel");
 const { createSpotGame } = require("./games/spot");
 const { createBaseballGame } = require("./games/baseball");
+const { AVATARS } = require("../avatars");
+
+const DEFAULT_AVATAR = AVATARS[0];
 
 // 실시간 게임 엔진을 구동하는 모드(그 외 모드는 상태 토글만)
 const ENGINE_MODES = new Set(["vowel", "spot", "baseball"]);
@@ -66,7 +69,7 @@ function attachRealtime(server) {
     hostId: room.hostId,
     difficulty: room.difficulty,
     rounds: room.rounds,
-    players: room.players.map((p) => ({ id: p.id, name: p.name, ready: !!p.ready })),
+    players: room.players.map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, ready: !!p.ready })),
   });
 
   // 게임 종료 → 방을 대기실로 되돌리고 게임 인스턴스 정리
@@ -82,7 +85,7 @@ function attachRealtime(server) {
   // 서버에 실시간 접속 중인 전체 플레이어 목록 (방 참여 여부 무관)
   const broadcastPresence = () => {
     const users = [];
-    for (const s of io.of("/").sockets.values()) users.push({ id: s.id, name: s.data.name });
+    for (const s of io.of("/").sockets.values()) users.push({ id: s.id, name: s.data.name, avatar: s.data.avatar });
     io.emit("presence", users);
   };
 
@@ -118,6 +121,7 @@ function attachRealtime(server) {
 
   io.on("connection", (socket) => {
     socket.data.name = "손님" + Math.floor(1000 + Math.random() * 9000);
+    socket.data.avatar = DEFAULT_AVATAR;
     socket.data.roomId = null;
 
     socket.emit("modes", MODES);
@@ -125,8 +129,11 @@ function attachRealtime(server) {
     socket.emit("rooms:update", Array.from(rooms.values()).map(publicRoom));
     broadcastPresence();
 
-    socket.on("identify", (name) => {
+    socket.on("identify", (payload) => {
+      const name = typeof payload === "string" ? payload : payload && payload.name;
+      const avatar = payload && typeof payload === "object" ? payload.avatar : null;
       socket.data.name = sanitize(name, NAME_MAX_LEN) || socket.data.name;
+      socket.data.avatar = AVATARS.includes(avatar) ? avatar : socket.data.avatar;
       broadcastPresence();
     });
 
@@ -169,7 +176,7 @@ function attachRealtime(server) {
         hostId: socket.id,
         hostName: socket.data.name,
         game: null,
-        players: [{ id: socket.id, name: socket.data.name, ready: true }],
+        players: [{ id: socket.id, name: socket.data.name, avatar: socket.data.avatar, ready: true }],
       };
       rooms.set(room.id, room);
       socket.join(room.id);
@@ -192,7 +199,7 @@ function attachRealtime(server) {
 
       leaveRoom(socket);
 
-      room.players.push({ id: socket.id, name: socket.data.name, ready: false });
+      room.players.push({ id: socket.id, name: socket.data.name, avatar: socket.data.avatar, ready: false });
       socket.join(room.id);
       socket.data.roomId = room.id;
 

@@ -43,6 +43,7 @@ jamo_puzzles ──< game_results (puzzle_id, 논리 참조 · FK 없음)
 | `email` | `TEXT` | 소셜 로그인은 이메일 동의항목이 없을 수 있어 NULL 허용 |
 | `password_hash` | `TEXT` | bcrypt(cost 10) 해시. 소셜 계정은 NULL |
 | `nickname` | `TEXT NOT NULL` | |
+| `avatar` | `TEXT NOT NULL DEFAULT '🙂'` | 프로필 아이콘. 파일 업로드가 아니라 서버 화이트리스트(`backend/src/avatars.js`) 이모지 중 선택 |
 | `provider` | `TEXT NOT NULL DEFAULT 'local'` | `local` \| `kakao` \| `google` \| `naver` |
 | `provider_id` | `TEXT` | 소셜 플랫폼 고유 ID. local 계정은 NULL |
 | `created_at`, `updated_at` | `TIMESTAMPTZ` | |

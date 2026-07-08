@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { AVATARS } = require("../avatars");
 
 const router = express.Router();
 
@@ -20,6 +21,26 @@ router.patch("/profile/nickname", async (req, res) => {
   } catch (e) {
     console.error("profile/nickname error:", e.message);
     res.status(500).json({ message: "서버 오류로 닉네임을 저장하지 못했습니다." });
+  }
+});
+
+// PATCH /api/profile/avatar  { avatar }  → 화이트리스트에 있는 이모지 중에서만 선택 가능
+router.patch("/profile/avatar", async (req, res) => {
+  if (!req.userId) return res.status(401).json({ message: "로그인이 필요합니다." });
+  const avatar = (req.body && req.body.avatar || "").trim();
+  if (!AVATARS.includes(avatar)) {
+    return res.status(400).json({ message: "선택할 수 없는 아이콘입니다." });
+  }
+  try {
+    const { rows } = await pool.query(
+      "UPDATE users SET avatar = $1 WHERE id = $2 RETURNING avatar",
+      [avatar, req.userId]
+    );
+    if (!rows[0]) return res.status(401).json({ message: "계정을 찾을 수 없습니다. 다시 로그인해주세요." });
+    res.json({ avatar: rows[0].avatar });
+  } catch (e) {
+    console.error("profile/avatar error:", e.message);
+    res.status(500).json({ message: "서버 오류로 아이콘을 저장하지 못했습니다." });
   }
 });
 

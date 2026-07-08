@@ -13,7 +13,7 @@ router.post("/login", async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      "SELECT id, username, email, nickname, password_hash FROM users WHERE username = $1",
+      "SELECT id, username, email, nickname, avatar, password_hash FROM users WHERE username = $1",
       [username]
     );
     const user = rows[0];
@@ -34,7 +34,7 @@ router.post("/login", async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, username: user.username, email: user.email, nickname: user.nickname },
+      user: { id: user.id, username: user.username, email: user.email, nickname: user.nickname, avatar: user.avatar },
     });
   } catch (err) {
     console.error("login 실패:", err.message);
