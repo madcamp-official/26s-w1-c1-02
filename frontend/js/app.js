@@ -14,8 +14,6 @@
   const AVATARS = ["🙂", "😎", "🤖", "👻", "🐱", "🐶", "🦊", "🐻", "🐼", "🐰", "🦁", "🐸", "🐧", "🦄", "🐢", "🔥", "⭐", "🎮"];
   // 소셜 로그인 직후 닉네임 확정 전까지는 소켓에 identify(실명일 수 있는 값)를 보내지 않는다
   let awaitingNicknameConfirm = (location.hash || "").replace("#", "") === "nickname-setup";
-  const AV_COLORS = ["#b07d43", "#7a9a5f", "#c67b5a", "#6a5a95", "#4a8a8a", "#a5643a"];
-  const avColor = (name) => AV_COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % AV_COLORS.length];
 
   // 로그아웃: 저장된 토큰/계정 정리 후 손님 상태로 복귀
   function logout() {
@@ -27,7 +25,7 @@
     DISPLAY_NAME = GUEST_ID;
     DISPLAY_AVATAR = DEFAULT_AVATAR;
     awaitingNicknameConfirm = false;
-    net.identify(DISPLAY_NAME);
+    net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
     go("login");
   }
 
@@ -84,7 +82,7 @@
       if (this.socket || typeof io === "undefined") return;
       const socket = io({ path: "/socket.io" });
       this.socket = socket;
-      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", DISPLAY_NAME); this.emit(); });
+      socket.on("connect", () => { this.connected = true; if (!awaitingNicknameConfirm) socket.emit("identify", { name: DISPLAY_NAME, avatar: DISPLAY_AVATAR }); this.emit(); });
       socket.on("disconnect", () => { this.connected = false; this.room = null; this.roomChat = []; this.emit(); });
       socket.on("modes", (modes) => { this.modes = modes; this.emit(); });
       socket.on("rooms:update", (rooms) => { this.rooms = rooms; this.emit(); });
@@ -95,7 +93,7 @@
       socket.on("room:chat", (msg) => { this.roomChat.push(msg); if (this.roomChat.length > 200) this.roomChat.shift(); this.emit(); });
       socket.on("room:notice", (text) => toast(text));
     },
-    identify(name) { if (this.socket) this.socket.emit("identify", name); },
+    identify(name, avatar) { if (this.socket) this.socket.emit("identify", { name, avatar }); },
     sendChat(text) { if (this.socket) this.socket.emit("chat:message", text); },
     pushChat(msg) { this.chat.push(msg); if (this.chat.length > 200) this.chat.shift(); this.emit(); },
     sendRoomChat(text) { if (this.socket) this.socket.emit("room:chat", text); },
@@ -273,8 +271,8 @@
               ${AVATARS.map((a) => `<button type="button" class="avatar-opt${a === DISPLAY_AVATAR ? " active" : ""}" data-avatar="${a}">${a}</button>`).join("")}
             </div>
           </div>
-          <div class="set-row">
-            <button class="login-btn" id="profile-save">저장</button>
+          <div class="profile-actions">
+            <button class="login-btn primary" id="profile-save">저장</button>
           </div>
         </div>
       </div>`);
@@ -303,7 +301,7 @@
           if (!res.ok) { toast(data.message || "닉네임 변경에 실패했습니다."); return; }
           DISPLAY_NAME = data.nickname;
           localStorage.setItem("mgh.nickname", DISPLAY_NAME);
-          net.identify(DISPLAY_NAME);
+          net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         }
         if (selectedAvatar !== DISPLAY_AVATAR) {
           const res = await fetch("/api/profile/avatar", {
@@ -315,6 +313,7 @@
           if (!res.ok) { toast(data.message || "아이콘 변경에 실패했습니다."); return; }
           DISPLAY_AVATAR = data.avatar;
           localStorage.setItem("mgh.avatar", DISPLAY_AVATAR);
+          net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         }
         close();
         render();
@@ -369,7 +368,7 @@
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
         DISPLAY_AVATAR = data.user.avatar || DEFAULT_AVATAR;
         localStorage.setItem("mgh.avatar", DISPLAY_AVATAR);
-        net.identify(DISPLAY_NAME);
+        net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         close();
         go("lobby");
       } catch {
@@ -462,7 +461,7 @@
       scroll.innerHTML = ordered.map((u) => {
         const name = u.name || "손님";
         const me = u.id && u.id === myId;
-        return `<div class="user-row"><div class="av" style="background:${avColor(name)}">${escape(name[0])}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
+        return `<div class="user-row"><div class="av">${u.avatar || DEFAULT_AVATAR}</div>${escape(name)}${me ? ' <span class="me-tag">(나)</span>' : ""}</div>`;
       }).join("");
     }
 
@@ -998,7 +997,7 @@
         else badge = `<span class="slot-badge ${p.ready ? "on" : "off"}">${p.ready ? "준비" : "대기중"}</span>`;
         return `
           <div class="slot filled${me ? " me-slot" : ""}">
-            <div class="av" style="background:${avColor(p.name)}">${escape(p.name[0] || "?")}</div>
+            <div class="av">${p.avatar || DEFAULT_AVATAR}</div>
             <span class="slot-name">${escape(p.name)}</span>
             ${badge}
           </div>`;
@@ -1127,7 +1126,7 @@
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
         DISPLAY_AVATAR = data.user.avatar || DEFAULT_AVATAR;
         localStorage.setItem("mgh.avatar", DISPLAY_AVATAR);
-        net.identify(DISPLAY_NAME);
+        net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         go("lobby");
       } catch {
         toast("서버에 연결할 수 없습니다.");
@@ -1195,7 +1194,7 @@
         DISPLAY_NAME = data.nickname;
         localStorage.setItem("mgh.nickname", DISPLAY_NAME);
         awaitingNicknameConfirm = false;
-        net.identify(DISPLAY_NAME);
+        net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
         go("lobby");
       } catch {
         toast("서버에 연결할 수 없습니다.");
