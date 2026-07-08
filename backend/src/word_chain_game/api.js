@@ -4,6 +4,7 @@ const express = require("express");
 const { pool } = require("../db");
 const stdict = require("../vowel_game/stdict");
 const puzzle = require("../vowel_game/puzzle");
+const { CHO } = require("../vowel_game/jamo");
 const { acceptableStarts } = require("./doeum");
 const { createProgressRouter } = require("../progress/api");
 
@@ -85,6 +86,46 @@ router.post("/check", async (req, res) => {
     res.json({ valid: true, nextChar, acceptableNext, remaining });
   } catch (e) {
     console.error("wordchain/check error:", e.message);
+    res.status(500).json({ error: "server_error" });
+  }
+});
+
+// 첫 글자(이미 화면에 나와있는 요구 글자라 힌트가 아님)만 그대로 두고, 나머지는 초성만 남긴다.
+// 예: "사슴벌레" → "사ㅅㅂㄹ". 정답 전체를 그냥 알려주지 않기 위함.
+function maskAsChosung(word) {
+  const cs = Array.from(word);
+  return cs
+    .map((ch, i) => {
+      if (i === 0) return ch;
+      const code = ch.codePointAt(0);
+      if (code < 0xac00 || code > 0xd7a3) return ch;
+      const choIdx = Math.floor((code - 0xac00) / (21 * 28));
+      return CHO[choIdx];
+    })
+    .join("");
+}
+
+// POST /hint  { requiredChar, usedWords, minLength? }  → 목숨 대가로 쓸 수 있는 초성 힌트 하나
+// (정답 전체가 아니라 첫 글자+나머지 초성만 알려줌. 자주 쓰는 단어 우선,
+// 보스 턴이면 글자 수 조건도 만족하는 것만).
+router.post("/hint", async (req, res) => {
+  const { requiredChar, usedWords, minLength } = req.body || {};
+  if (!requiredChar) return res.status(400).json({ error: "bad_request" });
+  try {
+    const starts = acceptableStarts(requiredChar);
+    const conds = starts.map((_, i) => `word LIKE $${i + 1}`).join(" OR ");
+    const params = starts.map((c) => `${c}%`);
+    // 글자 수 조건(보스 턴)을 먼저 SQL에서 걸러야 함 — 빈도 상위 N개만 뽑은 뒤 걸러내면
+    // 흔한 글자는 상위권이 죄다 짧은 단어라 조건 맞는 게 하나도 안 걸릴 수 있음.
+    let sql = `SELECT word FROM words WHERE is_answer_ok AND (${conds})`;
+    if (minLength) sql += ` AND char_length(word) >= $${params.length + 1}`;
+    sql += ` ORDER BY freq DESC LIMIT 50`;
+    const { rows } = await pool.query(sql, minLength ? [...params, minLength] : params);
+    const used = new Set(usedWords || []);
+    const word = rows.map((r) => r.word).find((w) => !used.has(w)) || null;
+    res.json({ hint: word ? maskAsChosung(word) : null });
+  } catch (e) {
+    console.error("wordchain/hint error:", e.message);
     res.status(500).json({ error: "server_error" });
   }
 });
