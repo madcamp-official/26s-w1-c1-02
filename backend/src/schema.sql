@@ -42,13 +42,14 @@ CREATE INDEX IF NOT EXISTS idx_results_leaderboard ON game_results (game, score 
 CREATE INDEX IF NOT EXISTS idx_results_user        ON game_results (user_id, game);
 
 -- 게임별 진행도 (모든 게임 공용)
+-- 유저당 1행(PK: user_id). level/exp 는 싱글+멀티 종합 경험치(유저 단위).
+-- 게임별 혼자하기 레벨 진행도는 meta 에 저장: {"jamo": {"level": N}, "spot": {"level": M}}
+-- (구 (user_id, game) 복합키 스키마에서의 이관은 1회성 수동 마이그레이션으로 수행함)
 CREATE TABLE IF NOT EXISTS user_game_progress (
-  user_id       BIGINT   NOT NULL,
-  game          TEXT     NOT NULL,
-  level         INTEGER  NOT NULL DEFAULT 1,
-  exp           INTEGER  NOT NULL DEFAULT 0,
-  cleared_count INTEGER  NOT NULL DEFAULT 0,
-  best_score    INTEGER  NOT NULL DEFAULT 0,
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, game)
+  user_id     BIGINT      PRIMARY KEY,
+  level       INTEGER     NOT NULL DEFAULT 1,    -- 종합 레벨
+  exp         INTEGER     NOT NULL DEFAULT 0,    -- 종합 경험치
+  best_score  INTEGER     NOT NULL DEFAULT 0,    -- 유저 최고 점수(프로필 통계용)
+  meta        JSONB       NOT NULL DEFAULT '{}', -- 게임별 solo 레벨 진행도
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );

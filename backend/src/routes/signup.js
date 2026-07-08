@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
+const { initUserProgress } = require("../progress/api");
 
 const router = express.Router();
 
@@ -31,6 +32,9 @@ router.post("/signup", async (req, res) => {
       if (e.code === "23505") return res.status(409).json({ message: "이미 사용 중인 아이디입니다." }); // unique violation (동시 가입 경합)
       throw e;
     }
+
+    // 싱글 게임 레벨 진행도 초기화(모두 레벨 1). 실패해도 가입은 계속(행 없으면 조회 시 기본 1).
+    await initUserProgress(user.id).catch((e) => console.error("progress init 실패:", e.message));
 
     const token = jwt.sign(
       { userId: user.id, username: user.username, nickname: user.nickname },

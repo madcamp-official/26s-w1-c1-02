@@ -19,8 +19,9 @@
   // 비로그인(손님)은 DB 행이 없으므로 이 브라우저에만 임시 저장한다.
   const LS_KEY = "mgh.spot.cleared";
   const isLoggedIn = () => !!localStorage.getItem("mgh.token");
+  // 진행도 = 깬 레벨 수. 0이면 아직 못 깸 → 레벨 1만 열림(기본 0).
   const getGuestCleared = () => Math.min(MAX_LEVEL, Math.max(0, parseInt(localStorage.getItem(LS_KEY), 10) || 0));
-  const setGuestCleared = (n) => localStorage.setItem(LS_KEY, String(Math.min(MAX_LEVEL, n)));
+  const setGuestCleared = (n) => localStorage.setItem(LS_KEY, String(Math.min(MAX_LEVEL, Math.max(0, n))));
 
   // 3레벨마다 격자를 한 단계 키운다(4×4→10×10). 같은 크기 구간에서는 레벨마다 제한 시간이 줄고,
   // 격자가 커질수록 기본 시간과 오답 페널티가 함께 커진다. 그래서 난이도는 레벨마다 단조 증가.
@@ -51,7 +52,7 @@
 
       let timer = null;
       let level = 1, cfg = null, round = null, seconds = 0, misses = 0, ended = true;
-      // 화면 표시용 진행도. 로그인 유저는 서버 DB에서 채운다. 손님은 이 브라우저 저장값으로 시작.
+      // 화면 표시용 진행도(깬 레벨 수). 로그인 유저는 서버 DB에서 채운다. 손님은 이 브라우저 저장값으로 시작.
       let cleared = isLoggedIn() ? 0 : getGuestCleared();
 
       const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
@@ -77,8 +78,10 @@
           const r = await fetch("/api/games/spot/progress", { headers: { Authorization: `Bearer ${token}` } });
           if (!r.ok) return;
           const data = await r.json();
-          if (typeof data.level === "number") {
-            cleared = Math.min(MAX_LEVEL, Math.max(0, data.level));
+          // 종목별 싱글 레벨 진행도는 서버가 내려주는 soloLevel(= meta[spot].level = 깬 레벨 수).
+          const soloLevel = data.soloLevel ?? data.meta?.spot?.level;
+          if (typeof soloLevel === "number") {
+            cleared = Math.min(MAX_LEVEL, Math.max(0, soloLevel));
             if (ended) showLevelSelect(); // 레벨 선택 화면이면 갱신, 플레이 중이면 다음 방문 때 반영
           }
         } catch (e) { /* 네트워크 오류 시 기존 표시값 유지 */ }
@@ -170,7 +173,7 @@
         const used = cfg.seconds - seconds;
         const wasNewUnlock = level > cleared && level < MAX_LEVEL;
         cleared = Math.max(cleared, level);
-        if (isLoggedIn()) reportLevelClear(level);  // 로그인: 서버 DB에 기록(단일 출처)
+        if (isLoggedIn()) reportLevelClear(level);  // 로그인: 서버 DB에 기록(깬 레벨 수 저장)
         else setGuestCleared(cleared);              // 손님: 이 브라우저에만 임시 저장
         overlay(`
           <div class="big">🎉</div>
