@@ -1116,7 +1116,6 @@
             <div class="login-or"><span>소셜 계정으로 시작</span></div>
             <div class="social">
               <button type="button" class="social-btn kakao">${ICON.kakao}<span>카카오로 시작하기</span></button>
-              <button type="button" class="social-btn naver">${ICON.naver}<span>네이버로 시작하기</span></button>
               <button type="button" class="social-btn google">${ICON.google}<span>Google로 시작하기</span></button>
             </div>
             <div class="login-or"><span>또는</span></div>
@@ -1167,10 +1166,6 @@
       }
       if (b.classList.contains("google")) {
         b.addEventListener("click", () => { location.href = "/auth/google"; });
-        return;
-      }
-      if (b.classList.contains("naver")) {
-        b.addEventListener("click", () => { location.href = "/auth/naver"; });
         return;
       }
     });
