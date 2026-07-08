@@ -11,6 +11,7 @@ const profileRouter = require("./routes/profile");
 const jamoApi = require("./vowel_game/api");
 const { cleanupExpiredPuzzles } = require("./vowel_game/puzzle");
 const { createProgressRouter } = require("./progress/api");
+const wordChainApi = require("./word_chain_game/api");
 
 const PORT = process.env.PORT || 8080;
 
@@ -34,6 +35,9 @@ app.use("/api/games/jamo", optionalAuth, jamoApi);
 
 // 게임 API — 다른 그림 찾기 (싱글 로직은 클라이언트 전용, 레벨 진행도만 서버에 저장)
 app.use("/api/games/spot", optionalAuth, createProgressRouter("spot"));
+
+// 게임 API — 끝말잇기 (단어 검증 + 레벨 진행도)
+app.use("/api/games/wordchain", optionalAuth, wordChainApi);
 
 const server = http.createServer(app);
 
