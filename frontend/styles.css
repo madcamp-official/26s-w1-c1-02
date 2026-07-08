@@ -67,15 +67,23 @@ button { font-family: inherit; cursor: pointer; }
 .nav-tab.active { background: var(--accent-soft); color: var(--ink); }
 .nav-spacer { flex: 1; }
 .nav-right { display: flex; align-items: center; gap: 14px; color: var(--ink-soft); }
-.nav-online { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(122,154,95,.18); }
 .nav-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f3ece1; font-size: 15px; border: 0; cursor: pointer; color: inherit; }
 .nav-guest {
   display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px;
-  border-radius: 999px; background: #f3ece1;
+  border-radius: 999px; background: #f3ece1; border: 0; cursor: pointer; font: inherit; color: inherit;
 }
+.nav-guest:hover { background: var(--accent-soft); }
 .nav-guest .av { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); display: grid; place-items: center; font-size: 13px; }
 .nav-guest .who { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+
+/* ---------- Profile modal (avatar picker) ---------- */
+.avatar-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.avatar-opt {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--card); font-size: 18px; display: grid; place-items: center; cursor: pointer;
+}
+.avatar-opt:hover { background: var(--accent-soft); }
+.avatar-opt.active { background: var(--accent-soft); border-color: var(--accent); }
 
 /* ---------- Main / layout with sidebar ---------- */
 .main { flex: 1; display: flex; gap: 16px; padding: 18px 20px; max-width: 1440px; width: 100%; margin: 0 auto; }

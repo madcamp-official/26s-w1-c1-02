@@ -24,7 +24,7 @@ router.post("/signup", async (req, res) => {
       const { rows } = await pool.query(
         `INSERT INTO users (username, email, password_hash, nickname)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, username, email, nickname`,
+         RETURNING id, username, email, nickname, avatar`,
         [username, email, passwordHash, nickname]
       );
       user = rows[0];
@@ -44,7 +44,7 @@ router.post("/signup", async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user.id, username: user.username, email: user.email, nickname: user.nickname },
+      user: { id: user.id, username: user.username, email: user.email, nickname: user.nickname, avatar: user.avatar },
     });
   } catch (err) {
     console.error("signup 실패:", err.message);

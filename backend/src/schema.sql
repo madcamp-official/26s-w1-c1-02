@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   nickname      TEXT     NOT NULL,
   provider      TEXT     NOT NULL DEFAULT 'local',  -- 'local' | 'kakao' | 'google' | 'naver'
   provider_id   TEXT,                       -- 소셜 플랫폼이 부여한 고유 ID (local 계정은 NULL)
+  avatar        TEXT     NOT NULL DEFAULT '🙂',  -- 프로필 아이콘(이모지 중 선택, 파일 업로드 아님)
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (username)
@@ -20,6 +21,7 @@ ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'local';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS provider_id TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT NOT NULL DEFAULT '🙂';
 
 -- provider+provider_id 중복 가입 방지 (local 계정은 provider_id가 NULL이라 서로 충돌하지 않음)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_provider_account ON users (provider, provider_id);
