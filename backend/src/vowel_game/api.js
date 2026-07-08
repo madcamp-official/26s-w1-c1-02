@@ -70,13 +70,12 @@ router.post("/submit", async (req, res) => {
 
     if (correct && req.userId) {
       await pool.query(
-        `INSERT INTO user_game_progress (user_id, game, level, exp, cleared_count, best_score, updated_at)
-         VALUES ($1, 'jamo', 1, $2, 1, $2, now())
-         ON CONFLICT (user_id, game) DO UPDATE SET
-           exp           = user_game_progress.exp + $2,
-           cleared_count = user_game_progress.cleared_count + 1,
-           best_score     = GREATEST(user_game_progress.best_score, $2),
-           updated_at     = now()`,
+        `INSERT INTO user_game_progress (user_id, exp, best_score, updated_at)
+         VALUES ($1, $2, $2, now())
+         ON CONFLICT (user_id) DO UPDATE SET
+           exp        = user_game_progress.exp + $2,
+           best_score = GREATEST(user_game_progress.best_score, $2),
+           updated_at = now()`,
         [req.userId, score]
       );
     }

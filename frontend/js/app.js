@@ -446,9 +446,12 @@
         const data = await res.json();
         const g = SOLO_GAMES.find((x) => x.id === id);
         if (!g) return;
-        if (g.lv !== data.level || g.done !== data.level || g.total !== maxLevel) changed = true;
-        g.lv = data.level;
-        g.done = data.level;
+        // soloLevel = 깬 레벨 수(0 기준). done=깬 레벨 수, lv=현재(플레이 가능한) 레벨=깬 수+1.
+        const cleared = data.soloLevel ?? data.meta?.[apiPath]?.level ?? 0;
+        const lv = Math.min(maxLevel, cleared + 1);
+        if (g.lv !== lv || g.done !== cleared || g.total !== maxLevel) changed = true;
+        g.lv = lv;
+        g.done = cleared;
         g.total = maxLevel;
       } catch (e) {
         // 네트워크 오류 시 기존 표시값 유지
