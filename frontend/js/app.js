@@ -126,64 +126,106 @@
 
   // ---------- audio (WebAudio, asset-free) ----------
   const audio = {
-    ctx: null, bgmGain: null, sfxGain: null, bgmNodes: null, _bgm: 0.5, _sfx: 0.7,
+    ctx: null, bgmGain: null, bgmNodes: null, _bgm: 0.5,
     ensure() {
       if (this.ctx) return;
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
       this.ctx = new Ctx();
       this.bgmGain = this.ctx.createGain();
-      this.bgmGain.gain.value = this._bgm * 0.12;
+      this.bgmGain.gain.value = this._bgm * 0.22;
       this.bgmGain.connect(this.ctx.destination);
-      this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = this._sfx;
-      this.sfxGain.connect(this.ctx.destination);
     },
     resume() { this.ensure(); if (this.ctx && this.ctx.state === "suspended") this.ctx.resume(); },
-    setBgm(v) { this._bgm = v; if (this.bgmGain) this.bgmGain.gain.value = v * 0.12; },
-    setSfx(v) { this._sfx = v; if (this.sfxGain) this.sfxGain.gain.value = v; },
-    blip() {
-      this.resume(); if (!this.ctx) return;
-      const t = this.ctx.currentTime;
-      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
-      o.type = "triangle"; o.frequency.value = 660;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.9, t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-      o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.17);
-    },
+    setBgm(v) { this._bgm = v; if (this.bgmGain) this.bgmGain.gain.value = v * 0.22; },
+    // 칩튠 스타일 루프 BGM: 112BPM 8분음표 시퀀서, Am–F–C–G 4마디 진행
+    // (베이스 + 멜로디 + 킥/하이햇, 전부 WebAudio 합성이라 에셋 불필요)
     startBgm() {
       this.resume(); if (!this.ctx || this.bgmNodes) return;
-      const freqs = [220, 277.18, 329.63]; // A minor-ish soft pad (A3 / C#4 / E4)
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = "lowpass"; filter.frequency.value = 700; filter.Q.value = 0.6;
-      filter.connect(this.bgmGain);
-      const lfo = this.ctx.createOscillator(), lfoGain = this.ctx.createGain();
-      lfo.frequency.value = 0.06; lfoGain.gain.value = 240;
-      lfo.connect(lfoGain); lfoGain.connect(filter.frequency); lfo.start();
-      const oscs = freqs.map((f, i) => {
-        const o = this.ctx.createOscillator();
-        o.type = "sine"; o.frequency.value = f; o.detune.value = (i - 1) * 4;
-        o.connect(filter); o.start();
-        return o;
-      });
-      this.bgmNodes = { oscs, lfo };
+      const ctx = this.ctx, out = this.bgmGain;
+      if (!this._noiseBuf) { // 하이햇용 노이즈 버퍼 (1회 생성)
+        const len = Math.floor(ctx.sampleRate * 0.1);
+        this._noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = this._noiseBuf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const STEP = 60 / 112 / 2; // 112BPM의 8분음표 길이(초)
+      const nf = (m) => 440 * Math.pow(2, (m - 69) / 12); // MIDI 번호 → 주파수
+      // 마디당 8스텝, null은 쉼표. MIDI: A2=45 F2=41 C3=48 G2=43
+      const BASS = [
+        [45, null, 57, null, 45, null, 57, 52],
+        [41, null, 53, null, 41, null, 53, 48],
+        [48, null, 60, null, 48, null, 60, 55],
+        [43, null, 55, null, 43, null, 55, 50],
+      ];
+      const MELODY = [
+        [69, null, 72, 76, null, 81, 76, 72],
+        [65, null, 69, 72, null, 77, 72, 69],
+        [64, null, 67, 72, null, 76, 72, 67],
+        [62, null, 67, 71, null, 74, 71, 67],
+      ];
+      const leadFilter = ctx.createBiquadFilter(); // 사각파 멜로디를 부드럽게
+      leadFilter.type = "lowpass"; leadFilter.frequency.value = 2200;
+      leadFilter.connect(out);
+      const tone = (type, midi, t, dur, peak, dest) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = type; o.frequency.value = nf(midi);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + 0.02);
+      };
+      const kick = (t) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.setValueAtTime(140, t);
+        o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+        g.gain.setValueAtTime(0.9, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.16);
+      };
+      const hat = (t, vol) => {
+        const s = ctx.createBufferSource(); s.buffer = this._noiseBuf;
+        const f = ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 6000;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+        s.connect(f); f.connect(g); g.connect(out); s.start(t); s.stop(t + 0.05);
+      };
+      const playStep = (i, t) => {
+        const bar = (i / 8) | 0, pos = i % 8;
+        const b = BASS[bar][pos], m = MELODY[bar][pos];
+        if (b != null) tone("triangle", b, t, STEP * 0.9, 0.55, out);
+        if (m != null) tone("square", m, t, STEP * 0.85, 0.22, leadFilter);
+        if (pos === 0 || pos === 4) kick(t);
+        if (pos === 2 || pos === 6) hat(t, 0.3);
+        else if (pos % 2 === 1) hat(t, 0.12);
+      };
+      // 룩어헤드 스케줄러: 타이머 오차와 무관하게 정확한 박자로 예약
+      const state = { step: 0, next: ctx.currentTime + 0.05 };
+      const timer = setInterval(() => {
+        while (state.next < ctx.currentTime + 0.2) {
+          playStep(state.step % 32, state.next);
+          state.next += STEP; state.step++;
+        }
+      }, 90);
+      this.bgmNodes = { timer, leadFilter };
     },
     stopBgm() {
       if (!this.bgmNodes) return;
-      this.bgmNodes.oscs.forEach((o) => { try { o.stop(); } catch (e) {} });
-      try { this.bgmNodes.lfo.stop(); } catch (e) {}
+      clearInterval(this.bgmNodes.timer);
+      // 이미 예약된 노트(최대 0.2초 분량)는 짧게 감쇠하며 자연 종료됨
+      try { this.bgmNodes.leadFilter.disconnect(); } catch (e) {}
       this.bgmNodes = null;
     },
   };
 
   // ---------- settings (persisted in localStorage) ----------
-  const LS = { theme: "mgh.theme", bgm: "mgh.bgm", sfx: "mgh.sfx", bgmOn: "mgh.bgmOn" };
+  const LS = { theme: "mgh.theme", bgm: "mgh.bgm", bgmOn: "mgh.bgmOn" };
   function lsNum(k, d) { const v = parseInt(localStorage.getItem(k), 10); return isNaN(v) ? d : v; }
   const settings = {
     theme: localStorage.getItem(LS.theme) || "light",
     bgm: lsNum(LS.bgm, 50),
-    sfx: lsNum(LS.sfx, 70),
     bgmOn: localStorage.getItem(LS.bgmOn) === "1",
   };
   function applyTheme(t) {
@@ -191,7 +233,7 @@
     document.documentElement.setAttribute("data-theme", t);
   }
   applyTheme(settings.theme);
-  audio._bgm = settings.bgm / 100; audio._sfx = settings.sfx / 100;
+  audio._bgm = settings.bgm / 100;
 
   function openSettings() {
     if (document.getElementById("settings-overlay")) return;
@@ -205,10 +247,6 @@
               <button class="set-toggle${settings.bgmOn ? " on" : ""}" id="bgm-toggle">${settings.bgmOn ? "⏸" : "▶"}</button>
               <input type="range" min="0" max="100" value="${settings.bgm}" id="s-bgm" />
             </div>
-          </div>
-          <div class="set-row">
-            <div class="set-label"><span>🔊 게임 소리</span><span class="set-val" id="v-sfx">${settings.sfx}%</span></div>
-            <div class="set-ctl"><input type="range" min="0" max="100" value="${settings.sfx}" id="s-sfx" /></div>
           </div>
           <div class="set-row">
             <div class="set-label"><span>🎨 테마</span></div>
@@ -238,13 +276,6 @@
       if (settings.bgmOn) { audio.setBgm(settings.bgm / 100); audio.startBgm(); tBgm.classList.add("on"); tBgm.textContent = "⏸"; }
       else { audio.stopBgm(); tBgm.classList.remove("on"); tBgm.textContent = "▶"; }
     });
-
-    const sSfx = o.querySelector("#s-sfx"), vSfx = o.querySelector("#v-sfx");
-    sSfx.addEventListener("input", () => {
-      settings.sfx = +sSfx.value; localStorage.setItem(LS.sfx, settings.sfx);
-      vSfx.textContent = settings.sfx + "%"; audio.setSfx(settings.sfx / 100);
-    });
-    sSfx.addEventListener("change", () => audio.blip()); // 슬라이더 놓으면 미리듣기
 
     o.querySelectorAll("[data-theme-opt]").forEach((b) => b.addEventListener("click", () => {
       applyTheme(b.dataset.themeOpt);
