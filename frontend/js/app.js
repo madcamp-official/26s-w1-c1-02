@@ -484,9 +484,8 @@
           <h1>미니게임천국에 오신 것을 환영합니다!</h1>
           <p>${DISPLAY_NAME}님, 오늘도 즐거운 게임 되세요 🎮</p>
           <div class="stats">
-            <div class="stat"><div class="n">0</div><div class="l">총 승리</div></div>
-            <div class="stat"><div class="n">–</div><div class="l">승률</div></div>
             <div class="stat"><div class="n" id="my-level">1</div><div class="l">레벨</div></div>
+            <div class="stat"><div class="n" id="my-exp">0 / 5000</div><div class="l">경험치</div></div>
           </div>
         </div>
         <div class="section-label">게임 모드 선택</div>
@@ -506,17 +505,20 @@
         </div>
       </div>`);
 
-    // 배너의 "레벨" 통계를 내 종합 레벨(presence)로 동기화 — 게임 후 exp 적립으로 오르면 자동 반영
+    // 배너의 "레벨"·"경험치" 통계를 내 종합 진행도(presence)로 동기화 — 게임 후 적립되면 자동 반영
     const myLevelEl = content.querySelector("#my-level");
+    const myExpEl = content.querySelector("#my-exp");
     const syncLevel = () => {
       const myId = net.socket && net.socket.id;
       const me = net.presence.find((u) => u.id === myId);
-      if (me) myLevelEl.textContent = me.level || 1;
+      if (!me) return;
+      myLevelEl.textContent = me.level || 1;
+      myExpEl.textContent = `${me.exp || 0} / 5000`;
     };
     net.listeners.add(syncLevel);
     content._cleanup = () => net.listeners.delete(syncLevel);
     syncLevel();
-    // 싱글 게임 exp 적립은 REST라 소켓의 레벨이 갱신 안 됨 — 로비로 올 때 재-identify로 DB 최신 레벨을 다시 읽어온다
+    // 싱글 게임 exp 적립은 REST라 소켓의 레벨/경험치가 갱신 안 됨 — 로비로 올 때 재-identify로 DB 최신값을 다시 읽어온다
     if (!awaitingNicknameConfirm) net.identify(DISPLAY_NAME, DISPLAY_AVATAR);
     return [content, null];
   }

@@ -5,7 +5,7 @@ const { createVowelGame, clampDiff, clampRounds } = require("./games/vowel");
 const { createSpotGame } = require("./games/spot");
 const { createBaseballGame } = require("./games/baseball");
 const { AVATARS } = require("../avatars");
-const { getUserLevel } = require("../progress/api");
+const { getUserProgress } = require("../progress/api");
 
 // identify 시 클라가 보낸 JWT 를 서버에서 검증해 userId 를 얻는다(클라가 보낸 userId 값을 믿지 않음).
 // 게스트/만료/위조 토큰은 null → exp 미적립, 레벨 1 로 표시.
@@ -99,7 +99,7 @@ function attachRealtime(server) {
   const broadcastPresence = () => {
     const users = [];
     for (const s of io.of("/").sockets.values())
-      users.push({ id: s.id, name: s.data.name, avatar: s.data.avatar, level: s.data.level || 1 });
+      users.push({ id: s.id, name: s.data.name, avatar: s.data.avatar, level: s.data.level || 1, exp: s.data.exp || 0 });
     io.emit("presence", users);
   };
 
@@ -139,6 +139,7 @@ function attachRealtime(server) {
     socket.data.roomId = null;
     socket.data.userId = null; // identify(토큰) 전까지는 게스트
     socket.data.level = 1;     // 종합 레벨(로비 접속자 목록 표시용)
+    socket.data.exp = 0;       // 현재 레벨 내 경험치(로비 배너 표시용)
 
     socket.emit("modes", MODES);
     socket.emit("chat:history", chatHistory.slice(-50));
@@ -151,10 +152,12 @@ function attachRealtime(server) {
       const token = payload && typeof payload === "object" ? payload.token : null;
       socket.data.name = sanitize(name, NAME_MAX_LEN) || socket.data.name;
       socket.data.avatar = AVATARS.includes(avatar) ? avatar : socket.data.avatar;
-      // 로그인 유저면 종합 레벨을 불러와 접속자 목록에 표시(비로그인/게스트는 1)
+      // 로그인 유저면 종합 레벨/경험치를 불러와 접속자 목록·배너에 표시(비로그인/게스트는 레벨1·exp0)
       const userId = userIdFromToken(token);
       socket.data.userId = userId;
-      socket.data.level = userId ? await getUserLevel(userId) : 1;
+      const prog = userId ? await getUserProgress(userId) : { level: 1, exp: 0 };
+      socket.data.level = prog.level;
+      socket.data.exp = prog.exp;
       broadcastPresence();
     });
 
