@@ -1,9 +1,22 @@
 // 멀티플레이 로비: 방 생성/참가/비밀방/방장 모드 변경 (in-memory, DB 미사용 — 휘발성 상태)
+const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 const { createVowelGame, clampDiff, clampRounds } = require("./games/vowel");
 const { createSpotGame } = require("./games/spot");
 const { createBaseballGame } = require("./games/baseball");
 const { AVATARS } = require("../avatars");
+const { getUserProgress } = require("../progress/api");
+
+// identify 시 클라가 보낸 JWT 를 서버에서 검증해 userId 를 얻는다(클라가 보낸 userId 값을 믿지 않음).
+// 게스트/만료/위조 토큰은 null → exp 미적립, 레벨 1 로 표시.
+function userIdFromToken(token) {
+  if (!token) return null;
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET).userId;
+  } catch (e) {
+    return null;
+  }
+}
 
 const DEFAULT_AVATAR = AVATARS[0];
 
@@ -82,10 +95,11 @@ function attachRealtime(server) {
     }
   }
 
-  // 서버에 실시간 접속 중인 전체 플레이어 목록 (방 참여 여부 무관)
+  // 서버에 실시간 접속 중인 전체 플레이어 목록 (방 참여 여부 무관). level = 종합 레벨(게스트/비로그인은 1)
   const broadcastPresence = () => {
     const users = [];
-    for (const s of io.of("/").sockets.values()) users.push({ id: s.id, name: s.data.name, avatar: s.data.avatar });
+    for (const s of io.of("/").sockets.values())
+      users.push({ id: s.id, name: s.data.name, avatar: s.data.avatar, level: s.data.level || 1, exp: s.data.exp || 0 });
     io.emit("presence", users);
   };
 
@@ -123,17 +137,27 @@ function attachRealtime(server) {
     socket.data.name = "손님" + Math.floor(1000 + Math.random() * 9000);
     socket.data.avatar = DEFAULT_AVATAR;
     socket.data.roomId = null;
+    socket.data.userId = null; // identify(토큰) 전까지는 게스트
+    socket.data.level = 1;     // 종합 레벨(로비 접속자 목록 표시용)
+    socket.data.exp = 0;       // 현재 레벨 내 경험치(로비 배너 표시용)
 
     socket.emit("modes", MODES);
     socket.emit("chat:history", chatHistory.slice(-50));
     socket.emit("rooms:update", Array.from(rooms.values()).map(publicRoom));
     broadcastPresence();
 
-    socket.on("identify", (payload) => {
+    socket.on("identify", async (payload) => {
       const name = typeof payload === "string" ? payload : payload && payload.name;
       const avatar = payload && typeof payload === "object" ? payload.avatar : null;
+      const token = payload && typeof payload === "object" ? payload.token : null;
       socket.data.name = sanitize(name, NAME_MAX_LEN) || socket.data.name;
       socket.data.avatar = AVATARS.includes(avatar) ? avatar : socket.data.avatar;
+      // 로그인 유저면 종합 레벨/경험치를 불러와 접속자 목록·배너에 표시(비로그인/게스트는 레벨1·exp0)
+      const userId = userIdFromToken(token);
+      socket.data.userId = userId;
+      const prog = userId ? await getUserProgress(userId) : { level: 1, exp: 0 };
+      socket.data.level = prog.level;
+      socket.data.exp = prog.exp;
       broadcastPresence();
     });
 
@@ -271,6 +295,8 @@ function attachRealtime(server) {
         if (ENGINE_MODES.has(room.mode)) {
           const opts = { difficulty: room.difficulty, rounds: room.rounds };
           room.onGameEnd = () => endGame(room);
+          // 게임오버 시 exp 적립으로 레벨이 바뀌면 접속자 목록을 즉시 갱신하기 위한 훅
+          room.refreshPresence = broadcastPresence;
           room.game = room.mode === "spot"
             ? createSpotGame(io, room, opts)
             : room.mode === "baseball"
